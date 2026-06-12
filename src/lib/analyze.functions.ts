@@ -159,7 +159,7 @@ export const analyzeMedicineImage = createServerFn({ method: "POST" })
     return input;
   })
   .handler(async ({ data }): Promise<AnalyzeResult> => {
-    const apiKey = process.env.LOVABLE_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY || process.env.LOVABLE_API_KEY;
     if (!apiKey) {
       return notMedicineEnvelope(
         "Verification service unavailable",
