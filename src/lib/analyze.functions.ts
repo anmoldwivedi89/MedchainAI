@@ -189,15 +189,16 @@ export const analyzeMedicineImage = createServerFn({ method: "POST" })
     pipelineLog("init", "info", "Verification pipeline started");
 
     // ── Environment validation ──
-    const apiKey = process.env.GEMINI_API_KEY || process.env.LOVABLE_API_KEY;
+    const apiKey = process.env.GROQ_API_KEY || process.env.GEMINI_API_KEY || process.env.LOVABLE_API_KEY;
     if (!apiKey) {
       pipelineLog("init", "error", "Missing API key", { 
+        hasGroq: !!process.env.GROQ_API_KEY,
         hasGemini: !!process.env.GEMINI_API_KEY,
         hasLovable: !!process.env.LOVABLE_API_KEY,
       });
       return notMedicineEnvelope(
-        "Gemini API Key Missing",
-        "Gemini API key missing. Please configure GEMINI_API_KEY in your environment variables. You can obtain one from Google AI Studio at aistudio.google.com/apikey.",
+        "API Key Missing",
+        "No AI API key configured. Please set GROQ_API_KEY or GEMINI_API_KEY in your environment variables.",
       );
     }
 
@@ -276,45 +277,86 @@ No markdown, no commentary, JSON only.`;
     const mimeType = mimeMatch?.[1] || "image/jpeg";
     const base64Data = mimeMatch?.[2] || data.imageDataUrl.replace(/^data:image\/[a-z+]+;base64,/i, "");
 
+    // Determine which API to use: Groq (GROQ_API_KEY) or Gemini (GEMINI_API_KEY)
+    const groqKey = process.env.GROQ_API_KEY;
+    const useGroq = !!groqKey;
+
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+    const groqUrl = "https://api.groq.com/openai/v1/chat/completions";
 
     try {
-      const requestBody = {
-        contents: [
-          {
-            parts: [
-              { text: systemPrompt + "\n\nAnalyze this image. Verbatim OCR first, then structured fields, then packaging analysis. JSON only." },
-              { inlineData: { mimeType, data: base64Data } },
-            ],
-          },
-        ],
-        generationConfig: {
-          maxOutputTokens: 3000,
-          temperature: 0.2,
-        },
-      };
+      let res: Response;
 
-      const res = await fetch(geminiUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(requestBody),
-      });
+      if (useGroq) {
+        // Use Groq API (OpenAI-compatible, free tier 30 RPM)
+        res = await fetch(groqUrl, {
+          method: "POST",
+          headers: { 
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${groqKey}`,
+          },
+          body: JSON.stringify({
+            model: "meta-llama/llama-4-scout-17b-16e-instruct",
+            messages: [
+              { role: "system", content: systemPrompt },
+              {
+                role: "user",
+                content: [
+                  { type: "text", text: "Analyze this image. Verbatim OCR first, then structured fields, then packaging analysis. JSON only." },
+                  { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Data}` } },
+                ],
+              },
+            ],
+            max_tokens: 3000,
+            temperature: 0.2,
+          }),
+        });
+      } else {
+        // Use Gemini API
+        res = await fetch(geminiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  { text: systemPrompt + "\n\nAnalyze this image. Verbatim OCR first, then structured fields, then packaging analysis. JSON only." },
+                  { inlineData: { mimeType, data: base64Data } },
+                ],
+              },
+            ],
+            generationConfig: {
+              maxOutputTokens: 3000,
+              temperature: 0.2,
+            },
+          }),
+        });
+      }
       if (!res.ok) {
-        pipelineLog("gemini", "error", `Gemini API returned ${res.status}`, { status: res.status });
+        pipelineLog("ai", "error", `AI API returned ${res.status}`, { status: res.status, provider: useGroq ? "groq" : "gemini" });
         if (res.status === 429) httpError = "Too many scan requests. Please wait a moment and try again.";
-        else if (res.status === 401 || res.status === 403) httpError = "The API key is invalid or expired. Please check your GEMINI_API_KEY.";
-        else if (res.status === 503 || res.status === 500) httpError = "The Gemini AI service is temporarily unavailable. Please try again in a few minutes.";
+        else if (res.status === 401 || res.status === 403) httpError = "The API key is invalid or expired. Please check your API key configuration.";
+        else if (res.status === 503 || res.status === 500) httpError = "The AI service is temporarily unavailable. Please try again in a few minutes.";
         else httpError = `Failed to analyze image (HTTP ${res.status}). Please try again with a clearer photo.`;
       } else {
-        aiJson = await res.json();
-        pipelineLog("gemini", "info", "Gemini response received", { 
+        const responseJson = await res.json();
+        if (useGroq) {
+          // Groq returns OpenAI format
+          const text = responseJson?.choices?.[0]?.message?.content ?? "";
+          const finish = responseJson?.choices?.[0]?.finish_reason;
+          aiJson = { candidates: [{ content: { parts: [{ text }] }, finishReason: finish === "length" ? "MAX_TOKENS" : "STOP" }] };
+        } else {
+          aiJson = responseJson;
+        }
+        pipelineLog("ai", "info", "AI response received", { 
+          provider: useGroq ? "groq" : "gemini",
           finishReason: aiJson?.candidates?.[0]?.finishReason,
           hasContent: !!aiJson?.candidates?.[0]?.content?.parts?.[0]?.text,
         });
       }
     } catch (e: any) {
-      pipelineLog("gemini", "error", "Network error contacting Gemini", { error: e?.message });
-      httpError = "Gemini request timeout. Check your internet connection and try again.";
+      pipelineLog("ai", "error", "Network error contacting AI", { error: e?.message });
+      httpError = "Network issue while contacting the verification engine. Please try again.";
     }
 
     if (httpError) {
