@@ -294,6 +294,7 @@ No markdown, no commentary, JSON only.`;
           generationConfig: {
             maxOutputTokens: 3000,
             temperature: 0.2,
+            responseMimeType: "application/json",
           },
         }),
       });
@@ -324,6 +325,11 @@ No markdown, no commentary, JSON only.`;
     const parsed = tryParseJSON(raw);
 
     if (!parsed || finish === "MAX_TOKENS") {
+      console.error("[MedChain:gemini] Failed to parse response", {
+        finishReason: finish,
+        rawLength: raw.length,
+        rawPreview: raw.slice(0, 200),
+      });
       pipelineLog("parse", "error", "Failed to parse Gemini response", { 
         finishReason: finish,
         rawLength: raw.length,
