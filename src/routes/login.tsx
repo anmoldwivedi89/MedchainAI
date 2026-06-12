@@ -1,10 +1,11 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { motion, useMotionValue, useTransform, animate, AnimatePresence } from "framer-motion";
 import {
   ShieldCheck, ArrowRight, Mail, Lock, Eye, EyeOff, CheckCircle2,
   Loader2, Sparkles, Activity, Building2, Pill, ShieldAlert,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Sign in — MedChain AI" }] }),
@@ -25,6 +26,18 @@ function Login() {
   const [showPw, setShowPw] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [error, setError] = useState("");
+  const { login, user, role: userRole } = useAuth();
+  const navigate = useNavigate();
+
+  // Redirect if already logged in
+  useEffect(() => {
+    if (user && userRole) {
+      if (userRole === "admin") navigate({ to: "/admin" });
+      else if (userRole === "company") navigate({ to: "/company" });
+      else navigate({ to: "/dashboard" });
+    }
+  }, [user, userRole, navigate]);
 
   const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const pwStrength = useMemo(() => {
@@ -36,15 +49,20 @@ function Login() {
     return s; // 0..4
   }, [password]);
 
-  function onSubmit(e: React.FormEvent) {
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!emailValid || password.length < 6) return;
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    setError("");
+    try {
+      await login(email, password);
       setSuccess(true);
-      setTimeout(() => { window.location.href = "/dashboard"; }, 700);
-    }, 1100);
+    } catch (err: any) {
+      setError(err.message?.includes("invalid-credential") 
+        ? "Invalid email or password" 
+        : err.message || "Login failed");
+      setLoading(false);
+    }
   }
 
   return (
@@ -89,6 +107,11 @@ function Login() {
 
           {/* Form */}
           <form onSubmit={onSubmit} className="space-y-4">
+            {error && (
+              <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-sm text-destructive">
+                {error}
+              </div>
+            )}
             <PremiumField
               icon={Mail}
               type="email"

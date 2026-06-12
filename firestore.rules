@@ -1,0 +1,41 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Admin email — only this email has admin privileges ───
+    function isAdmin() {
+      return request.auth != null && request.auth.token.email == "shobhitgupta19052005@gmail.com";
+    }
+
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    // Users collection — user can read/write their own doc, admin can read all
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isOwner(userId);
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Companies collection — company owner can read own, admin can read/update all
+    match /companies/{companyId} {
+      allow read: if isOwner(companyId) || isAdmin();
+      allow create: if isOwner(companyId);
+      allow update: if isAdmin(); // Only admin can verify/reject
+      allow delete: if isAdmin();
+    }
+
+    // BPO Officers — company can manage their own BPOs
+    match /bpo_officers/{bpoId} {
+      allow read: if request.auth != null && resource.data.companyId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.companyId == request.auth.uid;
+      allow update: if request.auth != null && resource.data.companyId == request.auth.uid;
+      allow delete: if request.auth != null && resource.data.companyId == request.auth.uid;
+      // Admin can also read all
+      allow read: if isAdmin();
+    }
+  }
+}

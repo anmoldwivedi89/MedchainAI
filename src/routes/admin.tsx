@@ -1,28 +1,99 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { AppShell, PageHeader } from "@/components/app-shell";
-import { Building2, Store, ShieldAlert, Boxes, CheckCircle2, X } from "lucide-react";
+import { Building2, Store, ShieldAlert, Boxes, CheckCircle2, X, Loader2 } from "lucide-react";
 import { ResponsiveContainer, LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip } from "recharts";
 import { verificationTrends, blockchainRecords } from "@/lib/mock";
+import { useAuth } from "@/contexts/AuthContext";
+import { useEffect, useState } from "react";
+import { collection, getDocs, doc, updateDoc, query, where } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({ meta: [{ title: "Admin Panel — MedChain AI" }] }),
   component: Page,
 });
 
-const pending = [
-  { kind: "Company", name: "Helix Pharma Pvt Ltd", id: "CMP-2241" },
-  { kind: "Pharmacy", name: "Greenleaf Medicals", id: "PH-8821" },
-  { kind: "Company", name: "Avesta Biosciences", id: "CMP-2242" },
-  { kind: "Pharmacy", name: "Cure & Care", id: "PH-8822" },
-];
+interface PendingCompany {
+  id: string;
+  companyName: string;
+  email: string;
+  registeredAt: string;
+}
 
 function Page() {
+  const { user, isAdmin, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const [pendingCompanies, setPendingCompanies] = useState<PendingCompany[]>([]);
+  const [loadingData, setLoadingData] = useState(true);
+
+  useEffect(() => {
+    if (!authLoading && (!user || !isAdmin)) {
+      navigate({ to: "/login" });
+    }
+  }, [user, isAdmin, authLoading, navigate]);
+
+  useEffect(() => {
+    if (isAdmin) {
+      fetchPendingCompanies();
+    }
+  }, [isAdmin]);
+
+  async function fetchPendingCompanies() {
+    try {
+      const q = query(collection(db, "companies"), where("verified", "==", false));
+      const snap = await getDocs(q);
+      const companies: PendingCompany[] = [];
+      snap.forEach((d) => {
+        const data = d.data();
+        companies.push({
+          id: d.id,
+          companyName: data.companyName,
+          email: data.email,
+          registeredAt: data.registeredAt,
+        });
+      });
+      setPendingCompanies(companies);
+    } catch (err) {
+      console.error("Error fetching companies:", err);
+    } finally {
+      setLoadingData(false);
+    }
+  }
+
+  async function approveCompany(companyId: string) {
+    try {
+      await updateDoc(doc(db, "companies", companyId), { verified: true });
+      setPendingCompanies((prev) => prev.filter((c) => c.id !== companyId));
+    } catch (err) {
+      console.error("Error approving company:", err);
+    }
+  }
+
+  async function rejectCompany(companyId: string) {
+    try {
+      await updateDoc(doc(db, "companies", companyId), { verified: false, rejected: true });
+      setPendingCompanies((prev) => prev.filter((c) => c.id !== companyId));
+    } catch (err) {
+      console.error("Error rejecting company:", err);
+    }
+  }
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen grid place-items-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isAdmin) return null;
+
   return (
     <AppShell>
-      <PageHeader title="Admin Panel" subtitle="Approve partners, monitor fraud, and audit the blockchain layer." />
+      <PageHeader title="Admin Panel" subtitle="Approve companies, monitor fraud, and audit the blockchain layer." />
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
         {[
-          { l: "Pending Companies", v: 12, i: Building2 },
+          { l: "Pending Companies", v: pendingCompanies.length, i: Building2 },
           { l: "Pending Pharmacies", v: 8, i: Store },
           { l: "Open Fraud Reports", v: 24, i: ShieldAlert },
           { l: "Blockchain Health", v: "OK", i: Boxes },
@@ -55,22 +126,43 @@ function Page() {
           </ResponsiveContainer>
         </div>
 
+        {/* Company Approval Queue */}
         <div className="rounded-2xl glass p-5">
-          <div className="font-medium mb-3">Approval queue</div>
-          <div className="space-y-2">
-            {pending.map((p) => (
-              <div key={p.id} className="flex items-center justify-between p-3 rounded-lg border border-border bg-background/40">
-                <div className="min-w-0">
-                  <div className="text-sm font-medium truncate">{p.name}</div>
-                  <div className="text-[10px] text-muted-foreground">{p.kind} · {p.id}</div>
+          <div className="font-medium mb-3">Company Approval Queue</div>
+          {loadingData ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : pendingCompanies.length === 0 ? (
+            <div className="text-sm text-muted-foreground py-8 text-center">No pending approvals</div>
+          ) : (
+            <div className="space-y-2 max-h-[300px] overflow-y-auto">
+              {pendingCompanies.map((c) => (
+                <div key={c.id} className="flex items-center justify-between p-3 rounded-lg border border-border bg-background/40">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium truncate">{c.companyName}</div>
+                    <div className="text-[10px] text-muted-foreground">{c.email}</div>
+                  </div>
+                  <div className="flex gap-1">
+                    <button
+                      onClick={() => approveCompany(c.id)}
+                      className="h-7 w-7 grid place-items-center rounded-md bg-emerald/15 text-emerald hover:bg-emerald/25 transition-colors"
+                      title="Approve"
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={() => rejectCompany(c.id)}
+                      className="h-7 w-7 grid place-items-center rounded-md bg-destructive/15 text-destructive hover:bg-destructive/25 transition-colors"
+                      title="Reject"
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
-                <div className="flex gap-1">
-                  <button className="h-7 w-7 grid place-items-center rounded-md bg-emerald/15 text-emerald"><CheckCircle2 className="h-3.5 w-3.5" /></button>
-                  <button className="h-7 w-7 grid place-items-center rounded-md bg-destructive/15 text-destructive"><X className="h-3.5 w-3.5" /></button>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="rounded-2xl glass p-5 lg:col-span-3">

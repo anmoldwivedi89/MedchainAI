@@ -2,9 +2,10 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import {
   LayoutDashboard, ShieldCheck, MapPin, Flame, History, Bell, Settings,
-  FileWarning, Building2, Store, ShieldAlert, Boxes, ScanLine,
+  FileWarning, Building2, Store, ShieldAlert, Boxes, ScanLine, LogOut,
 } from "lucide-react";
 import { ReactNode } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 
 const nav = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -26,6 +27,7 @@ const portals = [
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { user, role, logout } = useAuth();
 
   return (
     <div className="min-h-screen flex w-full bg-background text-foreground">
@@ -76,8 +78,16 @@ export function AppShell({ children }: { children: ReactNode }) {
         </nav>
         <div className="m-3 p-3 rounded-xl glass">
           <div className="text-xs text-muted-foreground">Signed in as</div>
-          <div className="text-sm font-medium">Dr. A. Mehra</div>
-          <div className="text-[10px] text-muted-foreground mt-1">User · Verified</div>
+          <div className="text-sm font-medium truncate">{user?.email ?? "Guest"}</div>
+          <div className="text-[10px] text-muted-foreground mt-1 capitalize">{role ?? "—"}</div>
+          {user && (
+            <button
+              onClick={() => { logout(); window.location.href = "/login"; }}
+              className="mt-2 w-full text-xs py-1.5 rounded-md border border-border hover:bg-destructive/10 hover:text-destructive transition-colors inline-flex items-center justify-center gap-1.5"
+            >
+              <LogOut className="h-3 w-3" /> Sign out
+            </button>
+          )}
         </div>
       </aside>
 
