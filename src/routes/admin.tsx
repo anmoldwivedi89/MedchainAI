@@ -5,8 +5,6 @@ import { ResponsiveContainer, LineChart, Line, CartesianGrid, XAxis, YAxis, Tool
 import { verificationTrends, blockchainRecords } from "@/lib/mock";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
-import { collection, getDocs, doc, updateDoc, query, where } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({ meta: [{ title: "Admin Panel — MedChain AI" }] }),
@@ -40,6 +38,9 @@ function Page() {
 
   async function fetchPendingCompanies() {
     try {
+      const { collection, getDocs, query, where } = await import("firebase/firestore");
+      const { getFirebaseDb } = await import("@/lib/firebase");
+      const db = getFirebaseDb();
       const q = query(collection(db, "companies"), where("verified", "==", false));
       const snap = await getDocs(q);
       const companies: PendingCompany[] = [];
@@ -62,6 +63,9 @@ function Page() {
 
   async function approveCompany(companyId: string) {
     try {
+      const { doc, updateDoc } = await import("firebase/firestore");
+      const { getFirebaseDb } = await import("@/lib/firebase");
+      const db = getFirebaseDb();
       await updateDoc(doc(db, "companies", companyId), { verified: true });
       setPendingCompanies((prev) => prev.filter((c) => c.id !== companyId));
     } catch (err) {
@@ -71,6 +75,9 @@ function Page() {
 
   async function rejectCompany(companyId: string) {
     try {
+      const { doc, updateDoc } = await import("firebase/firestore");
+      const { getFirebaseDb } = await import("@/lib/firebase");
+      const db = getFirebaseDb();
       await updateDoc(doc(db, "companies", companyId), { verified: false, rejected: true });
       setPendingCompanies((prev) => prev.filter((c) => c.id !== companyId));
     } catch (err) {
@@ -91,7 +98,7 @@ function Page() {
   return (
     <AppShell>
       <PageHeader title="Admin Panel" subtitle="Approve companies, monitor fraud, and audit the blockchain layer." />
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4">
         {[
           { l: "Pending Companies", v: pendingCompanies.length, i: Building2 },
           { l: "Pending Pharmacies", v: 8, i: Store },
@@ -100,26 +107,26 @@ function Page() {
         ].map((s) => {
           const I = s.i;
           return (
-            <div key={s.l} className="rounded-2xl glass p-5">
+            <div key={s.l} className="rounded-2xl glass p-3 sm:p-5">
               <div className="flex items-center justify-between">
-                <div className="h-9 w-9 rounded-lg gradient-primary grid place-items-center"><I className="h-4 w-4 text-primary-foreground" /></div>
+                <div className="h-8 w-8 sm:h-9 sm:w-9 rounded-lg gradient-primary grid place-items-center"><I className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary-foreground" /></div>
               </div>
-              <div className="text-2xl font-semibold mt-4">{s.v}</div>
-              <div className="text-xs text-muted-foreground">{s.l}</div>
+              <div className="text-lg sm:text-2xl font-semibold mt-3 sm:mt-4">{s.v}</div>
+              <div className="text-[10px] sm:text-xs text-muted-foreground">{s.l}</div>
             </div>
           );
         })}
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-4">
-        <div className="rounded-2xl glass p-5 lg:col-span-2">
-          <div className="font-medium mb-4">Verification volume</div>
-          <ResponsiveContainer width="100%" height={240}>
-            <LineChart data={verificationTrends} margin={{ left: -10 }}>
+      <div className="grid lg:grid-cols-3 gap-3 sm:gap-4">
+        <div className="rounded-2xl glass p-4 sm:p-5 lg:col-span-2">
+          <div className="font-medium mb-3 sm:mb-4 text-sm sm:text-base">Verification volume</div>
+          <ResponsiveContainer width="100%" height={200}>
+            <LineChart data={verificationTrends} margin={{ left: -20, right: 4 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis dataKey="day" stroke="var(--muted-foreground)" fontSize={11} />
-              <YAxis stroke="var(--muted-foreground)" fontSize={11} />
-              <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8 }} />
+              <XAxis dataKey="day" stroke="var(--muted-foreground)" fontSize={10} />
+              <YAxis stroke="var(--muted-foreground)" fontSize={10} width={30} />
+              <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11 }} />
               <Line dataKey="scans" stroke="var(--cyan)" strokeWidth={2.5} dot={false} />
               <Line dataKey="fraud" stroke="var(--destructive)" strokeWidth={2.5} dot={false} />
             </LineChart>
@@ -165,10 +172,10 @@ function Page() {
           )}
         </div>
 
-        <div className="rounded-2xl glass p-5 lg:col-span-3">
-          <div className="font-medium mb-3">Blockchain records</div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+        <div className="rounded-2xl glass p-4 sm:p-5 lg:col-span-3">
+          <div className="font-medium mb-3 text-sm sm:text-base">Blockchain records</div>
+          <div className="overflow-x-auto -mx-2">
+            <table className="w-full text-xs sm:text-sm min-w-[550px]">
               <thead className="text-xs uppercase tracking-widest text-muted-foreground">
                 <tr><th className="text-left px-3 py-2">Tx Hash</th><th className="text-left px-3 py-2">Medicine</th><th className="text-left px-3 py-2">Batch</th><th className="text-left px-3 py-2">Time</th><th className="text-left px-3 py-2">Status</th></tr>
               </thead>

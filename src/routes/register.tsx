@@ -2,8 +2,6 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ShieldCheck, ArrowRight, Loader2, Building2, Pill, Store } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
-import { doc, setDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 
 export const Route = createFileRoute("/register")({
   head: () => ({ meta: [{ title: "Create account — MedChain AI" }] }),
@@ -37,6 +35,11 @@ function Register() {
 
     try {
       const user = await register(email, password);
+
+      // Dynamic import for Firestore (SSR safe)
+      const { doc, setDoc } = await import("firebase/firestore");
+      const { getFirebaseDb } = await import("@/lib/firebase");
+      const db = getFirebaseDb();
 
       // Save user doc in Firestore
       await setDoc(doc(db, "users", user.uid), {

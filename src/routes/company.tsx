@@ -3,8 +3,6 @@ import { AppShell, PageHeader } from "@/components/app-shell";
 import { Plus, Upload, Building2, UserPlus, Shield, Loader2, AlertTriangle, Mail, Phone, MapPin, Trash2 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { useEffect, useState } from "react";
-import { collection, addDoc, getDocs, deleteDoc, doc, query, where } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 
 export const Route = createFileRoute("/company")({
   head: () => ({ meta: [{ title: "Company Portal — MedChain AI" }] }),
@@ -43,6 +41,9 @@ function Page() {
 
   async function fetchBPOs() {
     try {
+      const { collection, getDocs, query, where } = await import("firebase/firestore");
+      const { getFirebaseDb } = await import("@/lib/firebase");
+      const db = getFirebaseDb();
       const q = query(collection(db, "bpo_officers"), where("companyId", "==", user!.uid));
       const snap = await getDocs(q);
       const officers: BPO[] = [];
@@ -70,6 +71,9 @@ function Page() {
     if (!bpoForm.name || !bpoForm.email || !bpoForm.region) return;
     setAddingBPO(true);
     try {
+      const { collection, addDoc } = await import("firebase/firestore");
+      const { getFirebaseDb } = await import("@/lib/firebase");
+      const db = getFirebaseDb();
       const docRef = await addDoc(collection(db, "bpo_officers"), {
         ...bpoForm,
         companyId: user!.uid,
@@ -87,6 +91,9 @@ function Page() {
 
   async function removeBPO(bpoId: string) {
     try {
+      const { doc, deleteDoc } = await import("firebase/firestore");
+      const { getFirebaseDb } = await import("@/lib/firebase");
+      const db = getFirebaseDb();
       await deleteDoc(doc(db, "bpo_officers", bpoId));
       setBpoList((prev) => prev.filter((b) => b.id !== bpoId));
     } catch (err) {
@@ -140,22 +147,22 @@ function Page() {
       />
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-4">
         {[
           { l: "Registered SKUs", v: "248" },
           { l: "Anchored Batches", v: "14,229" },
           { l: "BPO Officers", v: bpoList.length },
           { l: "Open Reports", v: "12" },
         ].map((s) => (
-          <div key={s.l} className="rounded-2xl glass p-5">
-            <div className="text-xs text-muted-foreground">{s.l}</div>
-            <div className="text-2xl font-semibold mt-2">{s.v}</div>
+          <div key={s.l} className="rounded-2xl glass p-3 sm:p-5">
+            <div className="text-[10px] sm:text-xs text-muted-foreground">{s.l}</div>
+            <div className="text-lg sm:text-2xl font-semibold mt-1.5 sm:mt-2">{s.v}</div>
           </div>
         ))}
       </div>
 
       {/* BPO Section */}
-      <div className="grid lg:grid-cols-3 gap-4 mb-4">
+      <div className="grid lg:grid-cols-3 gap-3 sm:gap-4 mb-4">
         <div className="lg:col-span-2 rounded-2xl glass p-5">
           <div className="flex items-center justify-between mb-4">
             <div className="font-medium flex items-center gap-2">
@@ -228,7 +235,7 @@ function Page() {
             <Plus className="h-3.5 w-3.5" /> Add Medicine
           </button>
         </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {[
             { name: "Paracetamol 500mg", batches: 124, anchored: true },
             { name: "Amoxicillin 250mg", batches: 87, anchored: true },

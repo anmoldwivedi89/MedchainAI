@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { motion, AnimatePresence, useInView, useMotionValue, useTransform, animate } from "framer-motion";
 import {
   ShieldCheck, ScanLine, Boxes, MapPin, Sparkles, ArrowRight,
-  Brain, Zap, BadgeCheck, ChevronDown, Check, Activity, Cpu, Database, Lock,
+  Brain, Zap, BadgeCheck, ChevronDown, Check, Activity, Cpu, Database, Lock, Menu, X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
@@ -145,14 +145,15 @@ function AmbientBackground() {
    Nav
    ============================================================ */
 function Nav() {
+  const [mobileOpen, setMobileOpen] = useState(false);
   return (
     <header className="sticky top-0 z-50 border-b border-border/60 bg-background/70 backdrop-blur-xl">
-      <div className="max-w-7xl mx-auto px-6 h-16 flex items-center">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center">
         <Link to="/" className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-lg gradient-primary grid place-items-center glow-cyan">
-            <ShieldCheck className="h-4 w-4 text-primary-foreground" />
+          <div className="h-7 w-7 sm:h-8 sm:w-8 rounded-lg gradient-primary grid place-items-center glow-cyan">
+            <ShieldCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary-foreground" />
           </div>
-          <span className="font-semibold tracking-tight">MedChain AI</span>
+          <span className="font-semibold tracking-tight text-sm sm:text-base">MedChain AI</span>
         </Link>
         <nav className="hidden md:flex items-center gap-7 text-sm text-muted-foreground ml-12">
           <a href="#how" className="hover:text-foreground transition-colors">How it works</a>
@@ -161,12 +162,42 @@ function Nav() {
           <a href="#faq" className="hover:text-foreground transition-colors">FAQ</a>
         </nav>
         <div className="ml-auto flex items-center gap-2">
-          <Link to="/login" className="text-sm text-muted-foreground hover:text-foreground px-3 py-2">Sign in</Link>
-          <Link to="/verify" className="text-sm font-medium px-4 py-2 rounded-full gradient-primary text-primary-foreground hover:opacity-90 transition-opacity inline-flex items-center gap-2">
+          <Link to="/login" className="text-xs sm:text-sm text-muted-foreground hover:text-foreground px-2 sm:px-3 py-2">Sign in</Link>
+          <Link to="/verify" className="hidden sm:inline-flex text-sm font-medium px-4 py-2 rounded-full gradient-primary text-primary-foreground hover:opacity-90 transition-opacity items-center gap-2">
             Verify Medicine <ArrowRight className="h-3.5 w-3.5" />
           </Link>
+          {/* Mobile menu button */}
+          <button
+            onClick={() => setMobileOpen(!mobileOpen)}
+            className="md:hidden h-9 w-9 grid place-items-center rounded-lg border border-border"
+            aria-label="Toggle menu"
+          >
+            {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+          </button>
         </div>
       </div>
+      {/* Mobile dropdown */}
+      <AnimatePresence>
+        {mobileOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.25 }}
+            className="md:hidden overflow-hidden border-t border-border/60 bg-background/95 backdrop-blur-xl"
+          >
+            <div className="px-4 py-4 space-y-3">
+              <a href="#how" onClick={() => setMobileOpen(false)} className="block text-sm text-muted-foreground hover:text-foreground py-2">How it works</a>
+              <a href="#features" onClick={() => setMobileOpen(false)} className="block text-sm text-muted-foreground hover:text-foreground py-2">Platform</a>
+              <a href="#blockchain" onClick={() => setMobileOpen(false)} className="block text-sm text-muted-foreground hover:text-foreground py-2">Blockchain</a>
+              <a href="#faq" onClick={() => setMobileOpen(false)} className="block text-sm text-muted-foreground hover:text-foreground py-2">FAQ</a>
+              <Link to="/verify" onClick={() => setMobileOpen(false)} className="block text-sm font-medium px-4 py-2.5 rounded-lg gradient-primary text-primary-foreground text-center">
+                Verify Medicine
+              </Link>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </header>
   );
 }
@@ -178,10 +209,10 @@ function Hero() {
   return (
     <section className="relative">
       <div className="absolute inset-0 aurora opacity-90" />
-      <div className="relative max-w-7xl mx-auto px-6 pt-20 pb-24">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 pt-12 sm:pt-20 pb-16 sm:pb-24">
+        <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-center">
           <div>
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="mb-6">
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5 }} className="mb-4 sm:mb-6">
               <Eyebrow>
                 <span className="relative flex h-1.5 w-1.5">
                   <span className="absolute inline-flex h-full w-full rounded-full bg-primary opacity-75 animate-ping" />
@@ -191,30 +222,30 @@ function Hero() {
               </Eyebrow>
             </motion.div>
             <motion.h1 initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.05 }}
-              className="text-5xl md:text-6xl lg:text-7xl font-semibold tracking-tighter leading-[1.05]">
-              Building <span className="gradient-text">Trust</span> in<br />Every Medicine
+              className="text-3xl sm:text-5xl md:text-6xl lg:text-7xl font-semibold tracking-tighter leading-[1.05]">
+              Building <span className="gradient-text">Trust</span> in<br className="hidden sm:inline" /> Every Medicine
             </motion.h1>
             <motion.p initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.15 }}
-              className="mt-6 text-lg text-muted-foreground max-w-xl">
+              className="mt-4 sm:mt-6 text-sm sm:text-lg text-muted-foreground max-w-xl">
               AI-powered medicine verification, counterfeit detection, pharmacy intelligence, and blockchain-backed trust records — in a single enterprise platform.
             </motion.p>
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6, delay: 0.25 }}
-              className="mt-9 flex flex-wrap items-center gap-3">
-              <Link to="/verify" className="group relative inline-flex items-center gap-2 px-5 py-3 rounded-xl gradient-primary text-primary-foreground font-medium hover:opacity-90 transition-opacity glow-cyan overflow-hidden">
+              className="mt-6 sm:mt-9 flex flex-wrap items-center gap-3">
+              <Link to="/verify" className="group relative inline-flex items-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl gradient-primary text-primary-foreground font-medium hover:opacity-90 transition-opacity glow-cyan overflow-hidden text-sm sm:text-base">
                 <span className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-700 bg-gradient-to-r from-transparent via-white/30 to-transparent" />
                 <ScanLine className="h-4 w-4" /> Verify Now
               </Link>
-              <Link to="/dashboard" className="inline-flex items-center gap-2 px-5 py-3 rounded-xl glass-strong font-medium hover:bg-card transition-colors">
+              <Link to="/dashboard" className="inline-flex items-center gap-2 px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl glass-strong font-medium hover:bg-card transition-colors text-sm sm:text-base">
                 Explore Platform <ArrowRight className="h-4 w-4" />
               </Link>
             </motion.div>
-            <div className="mt-8 flex flex-wrap items-center gap-5 text-xs text-muted-foreground">
+            <div className="mt-6 sm:mt-8 flex flex-wrap items-center gap-3 sm:gap-5 text-[10px] sm:text-xs text-muted-foreground">
               <span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-emerald" /> HIPAA Compliant</span>
               <span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-emerald" /> Blockchain Verified</span>
               <span className="flex items-center gap-1.5"><Check className="h-3.5 w-3.5 text-emerald" /> Gemini AI</span>
             </div>
           </div>
-          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.35 }}>
+          <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.35 }} className="hidden md:block">
             <LiveTerminal />
           </motion.div>
         </div>
@@ -421,9 +452,9 @@ function LogosStrip() {
   const items = ["WHO Guidelines", "FDA Standards", "ISO 27001", "HIPAA Ready", "GDPR Compliant", "Polygon Verified"];
   return (
     <section className="border-y border-border/60 bg-card/30 relative">
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="text-center text-[10px] font-mono tracking-[0.25em] text-muted-foreground uppercase mb-5">Trusted by regulators, manufacturers & 12,000+ pharmacies</div>
-        <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-3 text-xs text-muted-foreground tracking-wide uppercase">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <div className="text-center text-[9px] sm:text-[10px] font-mono tracking-[0.2em] sm:tracking-[0.25em] text-muted-foreground uppercase mb-4 sm:mb-5">Trusted by regulators, manufacturers & 12,000+ pharmacies</div>
+        <div className="flex flex-wrap items-center justify-center gap-x-6 sm:gap-x-10 gap-y-2 sm:gap-y-3 text-[10px] sm:text-xs text-muted-foreground tracking-wide uppercase">
           {items.map((i, k) => (
             <motion.span key={i} initial={{ opacity: 0, y: 6 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: k * 0.05 }}>
               {i}
@@ -445,14 +476,14 @@ function Problem() {
     { v: 72, suffix: "%", l: "Of patients lack confidence in the medicine they receive." },
   ];
   return (
-    <section className="py-24 border-b border-border/60 relative">
-      <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-16">
+    <section className="py-16 sm:py-24 border-b border-border/60 relative">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 grid lg:grid-cols-2 gap-10 lg:gap-16">
         <Reveal>
           <Eyebrow>The problem</Eyebrow>
-          <h2 className="text-4xl font-semibold tracking-tight mt-4">A trust crisis in global healthcare.</h2>
-          <p className="mt-4 text-muted-foreground max-w-md">Patients have no reliable way to know whether the medicine in their hand is real. Regulators lack real-time intelligence. Pharmacies have no trust signal.</p>
+          <h2 className="text-2xl sm:text-4xl font-semibold tracking-tight mt-4">A trust crisis in global healthcare.</h2>
+          <p className="mt-4 text-sm sm:text-base text-muted-foreground max-w-md">Patients have no reliable way to know whether the medicine in their hand is real. Regulators lack real-time intelligence. Pharmacies have no trust signal.</p>
         </Reveal>
-        <div className="grid sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
           {pts.map((p, i) => (
             <motion.div
               key={p.l}
@@ -461,12 +492,12 @@ function Problem() {
               viewport={{ once: true }}
               transition={{ delay: i * 0.1, duration: 0.6 }}
               whileHover={{ y: -4 }}
-              className="rounded-2xl glass p-6 hover:border-primary/40 hover:shadow-[0_0_30px_-10px_var(--cyan)] transition-all"
+              className="rounded-2xl glass p-5 sm:p-6 hover:border-primary/40 hover:shadow-[0_0_30px_-10px_var(--cyan)] transition-all"
             >
-              <div className="text-3xl font-semibold">
+              <div className="text-2xl sm:text-3xl font-semibold">
                 <CountUp to={p.v} prefix={p.prefix || ""} suffix={p.suffix || ""} duration={1.6} />
               </div>
-              <div className="text-xs text-muted-foreground mt-3 leading-relaxed">{p.l}</div>
+              <div className="text-xs text-muted-foreground mt-2 sm:mt-3 leading-relaxed">{p.l}</div>
             </motion.div>
           ))}
         </div>
@@ -485,13 +516,13 @@ function HowItWorks() {
     { i: ShieldCheck, t: "Trust score returned", d: "Authenticity score, batch compliance, and history details are instantly delivered." },
   ];
   return (
-    <section id="how" className="py-24 border-b border-border/60 relative">
-      <div className="max-w-7xl mx-auto px-6">
-        <Reveal className="text-center mb-14">
+    <section id="how" className="py-16 sm:py-24 border-b border-border/60 relative">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <Reveal className="text-center mb-10 sm:mb-14">
           <Eyebrow>The solution</Eyebrow>
-          <h2 className="text-4xl font-semibold tracking-tight mt-4">Three steps from suspicion to certainty.</h2>
+          <h2 className="text-2xl sm:text-4xl font-semibold tracking-tight mt-4">Three steps from suspicion to certainty.</h2>
         </Reveal>
-        <div className="grid md:grid-cols-3 gap-4">
+        <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4">
           {steps.map((s, i) => {
             const Icon = s.i;
             return (
@@ -502,14 +533,14 @@ function HowItWorks() {
                 viewport={{ once: true }}
                 transition={{ delay: i * 0.12, duration: 0.6 }}
                 whileHover={{ y: -6 }}
-                className="rounded-2xl glass p-7 relative hover:border-primary/40 hover:shadow-[0_0_40px_-12px_var(--cyan)] transition-all"
+                className="rounded-2xl glass p-5 sm:p-7 relative hover:border-primary/40 hover:shadow-[0_0_40px_-12px_var(--cyan)] transition-all"
               >
-                <div className="absolute top-5 right-5 text-[10px] font-mono text-muted-foreground">0{i + 1}</div>
-                <div className="h-11 w-11 rounded-xl bg-primary/15 grid place-items-center mb-5">
-                  <Icon className="h-5 w-5 text-primary" />
+                <div className="absolute top-4 right-4 sm:top-5 sm:right-5 text-[10px] font-mono text-muted-foreground">0{i + 1}</div>
+                <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-primary/15 grid place-items-center mb-4 sm:mb-5">
+                  <Icon className="h-4 w-4 sm:h-5 sm:w-5 text-primary" />
                 </div>
-                <div className="font-semibold">{s.t}</div>
-                <div className="text-sm text-muted-foreground mt-2 leading-relaxed">{s.d}</div>
+                <div className="font-semibold text-sm sm:text-base">{s.t}</div>
+                <div className="text-xs sm:text-sm text-muted-foreground mt-2 leading-relaxed">{s.d}</div>
               </motion.div>
             );
           })}
@@ -532,13 +563,13 @@ function TrustStack() {
     { t: "Enterprise SLAs", d: "99.99% uptime, edge-ready, observable end-to-end." },
   ];
   return (
-    <section id="features" className="py-24 border-b border-border/60 relative">
-      <div className="max-w-7xl mx-auto px-6">
+    <section id="features" className="py-16 sm:py-24 border-b border-border/60 relative">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <Reveal>
           <Eyebrow>Platform</Eyebrow>
-          <h2 className="text-4xl font-semibold tracking-tight mt-4 max-w-2xl">The trust stack the industry has been waiting for.</h2>
+          <h2 className="text-2xl sm:text-4xl font-semibold tracking-tight mt-4 max-w-2xl">The trust stack the industry has been waiting for.</h2>
         </Reveal>
-        <div className="grid md:grid-cols-3 gap-4 mt-12">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 mt-8 sm:mt-12">
           {feats.map((f, i) => (
             <motion.div
               key={f.t}
@@ -547,11 +578,11 @@ function TrustStack() {
               viewport={{ once: true }}
               transition={{ delay: (i % 3) * 0.1 + Math.floor(i / 3) * 0.05, duration: 0.5 }}
               whileHover={{ y: -5 }}
-              className="rounded-2xl glass p-6 hover:border-primary/40 hover:shadow-[0_0_36px_-14px_var(--cyan)] transition-all"
+              className="rounded-2xl glass p-5 sm:p-6 hover:border-primary/40 hover:shadow-[0_0_36px_-14px_var(--cyan)] transition-all"
             >
-              <div className="h-1.5 w-8 rounded-full gradient-primary mb-5" />
-              <div className="font-semibold">{f.t}</div>
-              <div className="text-sm text-muted-foreground mt-2 leading-relaxed">{f.d}</div>
+              <div className="h-1.5 w-8 rounded-full gradient-primary mb-4 sm:mb-5" />
+              <div className="font-semibold text-sm sm:text-base">{f.t}</div>
+              <div className="text-xs sm:text-sm text-muted-foreground mt-2 leading-relaxed">{f.d}</div>
             </motion.div>
           ))}
         </div>
@@ -569,13 +600,13 @@ function Pipeline() {
     "Fraud Intelligence", "AI Risk Analysis", "Blockchain Validation", "Authenticity Score",
   ];
   return (
-    <section className="py-24 border-b border-border/60 relative">
-      <div className="max-w-7xl mx-auto px-6">
+    <section className="py-16 sm:py-24 border-b border-border/60 relative">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <Reveal>
           <Eyebrow>The core engine</Eyebrow>
-          <h2 className="text-4xl font-semibold tracking-tight mt-4 max-w-2xl">Eight-stage pipeline. One score.</h2>
+          <h2 className="text-2xl sm:text-4xl font-semibold tracking-tight mt-4 max-w-2xl">Eight-stage pipeline. One score.</h2>
         </Reveal>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-12">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 sm:gap-3 mt-8 sm:mt-12">
           {stages.map((s, i) => (
             <motion.div
               key={s}
@@ -584,10 +615,10 @@ function Pipeline() {
               viewport={{ once: true }}
               transition={{ delay: i * 0.07, duration: 0.5 }}
               whileHover={{ y: -4 }}
-              className={`rounded-xl border p-5 bg-card/40 transition-all ${i === 7 ? "border-primary/50 bg-primary/5 shadow-[0_0_30px_-12px_var(--cyan)]" : "border-border hover:border-primary/40 hover:shadow-[0_0_24px_-12px_var(--cyan)]"}`}
+              className={`rounded-xl border p-3 sm:p-5 bg-card/40 transition-all ${i === 7 ? "border-primary/50 bg-primary/5 shadow-[0_0_30px_-12px_var(--cyan)]" : "border-border hover:border-primary/40 hover:shadow-[0_0_24px_-12px_var(--cyan)]"}`}
             >
-              <div className={`text-[10px] font-mono uppercase tracking-widest mb-2 ${i === 7 ? "text-primary" : "text-muted-foreground"}`}>Stage 0{i + 1}</div>
-              <div className="text-sm font-semibold">{s}</div>
+              <div className={`text-[9px] sm:text-[10px] font-mono uppercase tracking-widest mb-1.5 sm:mb-2 ${i === 7 ? "text-primary" : "text-muted-foreground"}`}>Stage 0{i + 1}</div>
+              <div className="text-xs sm:text-sm font-semibold">{s}</div>
             </motion.div>
           ))}
         </div>
@@ -637,16 +668,16 @@ function Audit() {
   }, []);
 
   return (
-    <section id="blockchain" className="py-24 border-b border-border/60 relative">
-      <div className="max-w-7xl mx-auto px-6 grid lg:grid-cols-2 gap-16 items-center">
+    <section id="blockchain" className="py-16 sm:py-24 border-b border-border/60 relative">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
         <Reveal>
           <Eyebrow>Accountability</Eyebrow>
-          <h2 className="text-4xl font-semibold tracking-tight mt-4 leading-tight">Immutable audit trail.<br />Regulator-ready.</h2>
-          <p className="mt-4 text-muted-foreground">Every scan, every verification, and every report is anchored to a tamper-proof ledger. Export proofs for FDA, WHO, and EMA in one click.</p>
-          <ul className="mt-7 space-y-3 text-sm">
+          <h2 className="text-2xl sm:text-4xl font-semibold tracking-tight mt-4 leading-tight">Immutable audit trail.<br />Regulator-ready.</h2>
+          <p className="mt-4 text-sm sm:text-base text-muted-foreground">Every scan, every verification, and every report is anchored to a tamper-proof ledger. Export proofs for FDA, WHO, and EMA in one click.</p>
+          <ul className="mt-5 sm:mt-7 space-y-3 text-sm">
             {["Direct-source manufacturer batches", "Full availability history tracking", "Geo-fencing for regional permits"].map((l) => (
               <li key={l} className="flex items-center gap-3">
-                <div className="h-5 w-5 rounded-full bg-emerald/15 grid place-items-center"><Check className="h-3 w-3 text-emerald" /></div>
+                <div className="h-5 w-5 rounded-full bg-emerald/15 grid place-items-center shrink-0"><Check className="h-3 w-3 text-emerald" /></div>
                 {l}
               </li>
             ))}
@@ -713,25 +744,25 @@ function ChartsRow() {
   }, []);
 
   return (
-    <section className="py-24 border-b border-border/60 relative">
-      <div className="max-w-7xl mx-auto px-6">
+    <section className="py-16 sm:py-24 border-b border-border/60 relative">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <Reveal>
           <Eyebrow>Live intelligence</Eyebrow>
-          <h2 className="text-4xl font-semibold tracking-tight mt-4 max-w-2xl">See counterfeits before they reach a patient.</h2>
+          <h2 className="text-2xl sm:text-4xl font-semibold tracking-tight mt-4 max-w-2xl">See counterfeits before they reach a patient.</h2>
         </Reveal>
-        <div className="grid md:grid-cols-2 gap-4 mt-12">
+        <div className="grid md:grid-cols-2 gap-3 sm:gap-4 mt-8 sm:mt-12">
           <Reveal>
-            <div className="rounded-2xl glass p-6 hover:border-primary/30 transition-colors">
+            <div className="rounded-2xl glass p-4 sm:p-6 hover:border-primary/30 transition-colors">
               <div className="flex items-center justify-between mb-1">
                 <div>
-                  <div className="text-sm font-semibold">Verification trends</div>
-                  <div className="text-[11px] text-muted-foreground">Last 30 days · global volume</div>
+                  <div className="text-xs sm:text-sm font-semibold">Verification trends</div>
+                  <div className="text-[10px] sm:text-[11px] text-muted-foreground">Last 30 days · global volume</div>
                 </div>
-                <div className="text-sm font-semibold text-primary">
+                <div className="text-xs sm:text-sm font-semibold text-primary">
                   +<CountUp to={12.4} decimals={1} format={false} duration={1.6} suffix="%" />
                 </div>
               </div>
-              <div className="h-44 mt-4">
+              <div className="h-36 sm:h-44 mt-3 sm:mt-4">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={data}>
                     <defs>
@@ -741,38 +772,38 @@ function ChartsRow() {
                       </linearGradient>
                     </defs>
                     <XAxis dataKey="x" hide />
-                    <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12 }} />
-                    <Area type="monotone" dataKey="v" stroke="var(--cyan)" strokeWidth={2} fill="url(#ag)" isAnimationActive animationDuration={1200} dot={{ r: 2, fill: "var(--cyan)" }} activeDot={{ r: 5 }} />
+                    <Tooltip contentStyle={{ background: "var(--card)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 11 }} />
+                    <Area type="monotone" dataKey="v" stroke="var(--cyan)" strokeWidth={2} fill="url(#ag)" isAnimationActive animationDuration={1200} dot={{ r: 2, fill: "var(--cyan)" }} activeDot={{ r: 4 }} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
             </div>
           </Reveal>
           <Reveal delay={0.08}>
-            <div className="rounded-2xl glass p-6 hover:border-primary/30 transition-colors">
-              <div className="text-sm font-semibold">Risk distribution</div>
-              <div className="text-[11px] text-muted-foreground">All verifications</div>
-              <div className="flex items-center gap-6 mt-4">
-                <div className="h-44 w-44 relative">
+            <div className="rounded-2xl glass p-4 sm:p-6 hover:border-primary/30 transition-colors">
+              <div className="text-xs sm:text-sm font-semibold">Risk distribution</div>
+              <div className="text-[10px] sm:text-[11px] text-muted-foreground">All verifications</div>
+              <div className="flex items-center gap-4 sm:gap-6 mt-3 sm:mt-4">
+                <div className="h-32 w-32 sm:h-44 sm:w-44 relative shrink-0">
                   <ResponsiveContainer>
                     <PieChart>
-                      <Pie data={riskData} dataKey="value" innerRadius={50} outerRadius={75} stroke="none" isAnimationActive animationDuration={1400} animationBegin={200}>
+                      <Pie data={riskData} dataKey="value" innerRadius="55%" outerRadius="85%" stroke="none" isAnimationActive animationDuration={1400} animationBegin={200}>
                         {riskData.map((_, i) => <Cell key={i} fill={RISK_COLORS[i]} />)}
                       </Pie>
                     </PieChart>
                   </ResponsiveContainer>
                   <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                     <motion.div
-                      className="text-2xl font-semibold"
+                      className="text-xl sm:text-2xl font-semibold"
                       animate={{ opacity: [0.7, 1, 0.7] }}
                       transition={{ duration: 2.4, repeat: Infinity }}
                     >
                       <CountUp to={84} suffix="%" duration={1.8} />
                     </motion.div>
-                    <div className="text-[10px] text-muted-foreground uppercase tracking-widest">Authentic</div>
+                    <div className="text-[9px] sm:text-[10px] text-muted-foreground uppercase tracking-widest">Authentic</div>
                   </div>
                 </div>
-                <div className="space-y-3 text-xs">
+                <div className="space-y-2 sm:space-y-3 text-xs">
                   {riskData.map((r, i) => (
                     <motion.div
                       key={r.name}
@@ -782,7 +813,7 @@ function ChartsRow() {
                       transition={{ delay: i * 0.12 }}
                       className="flex items-center gap-2"
                     >
-                      <span className="h-2.5 w-2.5 rounded-sm" style={{ background: RISK_COLORS[i] }} />
+                      <span className="h-2.5 w-2.5 rounded-sm shrink-0" style={{ background: RISK_COLORS[i] }} />
                       <span className="font-medium">{r.name}</span>
                       <span className="text-muted-foreground font-mono">
                         <CountUp to={r.value} suffix="%" duration={1.4} />
@@ -809,15 +840,15 @@ function Pharmacies() {
     { n: "Guardian Pharmacy", d: "Bengaluru · 1.2 km", t: 94 },
   ];
   return (
-    <section className="py-24 border-b border-border/60 relative">
-      <div className="max-w-7xl mx-auto px-6">
+    <section className="py-16 sm:py-24 border-b border-border/60 relative">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <Reveal>
           <Eyebrow>Verified network</Eyebrow>
-          <h2 className="text-4xl font-semibold tracking-tight mt-4 max-w-2xl">
+          <h2 className="text-2xl sm:text-4xl font-semibold tracking-tight mt-4 max-w-2xl">
             <CountUp to={12847} duration={2} /> verified dispensaries — and counting.
           </h2>
         </Reveal>
-        <div className="grid md:grid-cols-3 gap-4 mt-12">
+        <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3 sm:gap-4 mt-8 sm:mt-12">
           {items.map((p, i) => (
             <motion.div
               key={p.n}
@@ -826,27 +857,27 @@ function Pharmacies() {
               viewport={{ once: true }}
               transition={{ delay: i * 0.12, duration: 0.55 }}
               whileHover={{ scale: 1.03 }}
-              className="rounded-2xl glass p-6 hover:border-primary/50 hover:shadow-[0_0_40px_-10px_var(--cyan)] transition-all"
+              className="rounded-2xl glass p-5 sm:p-6 hover:border-primary/50 hover:shadow-[0_0_40px_-10px_var(--cyan)] transition-all"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg gradient-primary grid place-items-center"><MapPin className="h-4 w-4 text-primary-foreground" /></div>
+                  <div className="h-9 w-9 sm:h-10 sm:w-10 rounded-lg gradient-primary grid place-items-center"><MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary-foreground" /></div>
                   <div>
-                    <div className="text-sm font-medium flex items-center gap-1.5">
+                    <div className="text-xs sm:text-sm font-medium flex items-center gap-1.5">
                       {p.n}
                       <motion.span animate={{ scale: [1, 1.2, 1] }} transition={{ duration: 2, repeat: Infinity, delay: i * 0.3 }}>
-                        <BadgeCheck className="h-3.5 w-3.5 text-emerald" />
+                        <BadgeCheck className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-emerald" />
                       </motion.span>
                     </div>
-                    <div className="text-[11px] text-muted-foreground">{p.d}</div>
+                    <div className="text-[10px] sm:text-[11px] text-muted-foreground">{p.d}</div>
                   </div>
                 </div>
-                <span className="text-[10px] font-mono px-2 py-1 rounded-md bg-emerald/15 text-emerald">Verified</span>
+                <span className="text-[10px] font-mono px-2 py-1 rounded-md bg-emerald/15 text-emerald hidden sm:inline">Verified</span>
               </div>
-              <div className="text-3xl font-semibold mt-5">
+              <div className="text-2xl sm:text-3xl font-semibold mt-4 sm:mt-5">
                 <CountUp to={p.t} duration={1.6} />
               </div>
-              <div className="text-[10px] uppercase tracking-widest text-muted-foreground">Trust score</div>
+              <div className="text-[9px] sm:text-[10px] uppercase tracking-widest text-muted-foreground">Trust score</div>
             </motion.div>
           ))}
         </div>
@@ -866,8 +897,8 @@ function BigStats() {
     { v: 41259, l: "Cities operating" },
   ];
   return (
-    <section className="py-20 border-y border-border/60 bg-card/30 relative">
-      <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+    <section className="py-14 sm:py-20 border-y border-border/60 bg-card/30 relative">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 grid grid-cols-2 md:grid-cols-4 gap-6 sm:gap-8 text-center">
         {s.map((x, i) => (
           <motion.div
             key={x.l}
@@ -876,10 +907,10 @@ function BigStats() {
             viewport={{ once: true }}
             transition={{ delay: i * 0.08 }}
           >
-            <div className="text-3xl md:text-4xl font-semibold gradient-text tracking-tight">
+            <div className="text-2xl sm:text-3xl md:text-4xl font-semibold gradient-text tracking-tight">
               <CountUp to={x.v} duration={2.2} />
             </div>
-            <div className="text-[10px] text-muted-foreground mt-2 uppercase tracking-[0.2em]">{x.l}</div>
+            <div className="text-[9px] sm:text-[10px] text-muted-foreground mt-1.5 sm:mt-2 uppercase tracking-[0.15em] sm:tracking-[0.2em]">{x.l}</div>
           </motion.div>
         ))}
       </div>
@@ -905,18 +936,18 @@ function Testimonials() {
   }, [paused, items.length]);
 
   return (
-    <section className="py-24 border-b border-border/60 relative">
-      <div className="max-w-7xl mx-auto px-6">
+    <section className="py-16 sm:py-24 border-b border-border/60 relative">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <Reveal>
           <Eyebrow>Field-tested</Eyebrow>
-          <h2 className="text-4xl font-semibold tracking-tight mt-4 max-w-2xl">Loved by quality officers and CTOs alike.</h2>
+          <h2 className="text-2xl sm:text-4xl font-semibold tracking-tight mt-4 max-w-2xl">Loved by quality officers and CTOs alike.</h2>
         </Reveal>
         <div
-          className="mt-12 relative max-w-3xl mx-auto"
+          className="mt-8 sm:mt-12 relative max-w-3xl mx-auto"
           onMouseEnter={() => setPaused(true)}
           onMouseLeave={() => setPaused(false)}
         >
-          <div className="rounded-2xl glass p-10 min-h-[220px] relative overflow-hidden">
+          <div className="rounded-2xl glass p-6 sm:p-10 min-h-[180px] sm:min-h-[220px] relative overflow-hidden">
             <AnimatePresence mode="wait">
               <motion.div
                 key={idx}
@@ -926,7 +957,7 @@ function Testimonials() {
                 transition={{ duration: 0.55, ease: [0.16, 1, 0.3, 1] }}
               >
                 <Activity className="h-5 w-5 text-primary" />
-                <p className="mt-5 text-lg leading-relaxed">"{items[idx].q}"</p>
+                <p className="mt-4 sm:mt-5 text-sm sm:text-lg leading-relaxed">"{items[idx].q}"</p>
                 <div className="mt-6 text-sm">
                   <div className="font-semibold">{items[idx].n}</div>
                   <div className="text-muted-foreground text-xs">{items[idx].r}</div>
@@ -962,11 +993,11 @@ function FAQ() {
     { q: "What languages are supported?", a: "OCR is trained for 24+ languages including English, Hindi, Bengali, Arabic, Spanish, French, Portuguese, and Mandarin." },
   ];
   return (
-    <section id="faq" className="py-24 border-b border-border/60 relative">
-      <div className="max-w-3xl mx-auto px-6">
+    <section id="faq" className="py-16 sm:py-24 border-b border-border/60 relative">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6">
         <Reveal className="text-center">
           <Eyebrow>FAQ</Eyebrow>
-          <h2 className="text-4xl font-semibold tracking-tight mt-4">Questions, answered.</h2>
+          <h2 className="text-2xl sm:text-4xl font-semibold tracking-tight mt-4">Questions, answered.</h2>
         </Reveal>
         <div className="mt-10 space-y-3">
           {items.map((it, i) => <FAQItem key={i} {...it} />)}
@@ -1014,8 +1045,8 @@ function CTABanner() {
   const ref = useRef<HTMLDivElement>(null);
   const [m, setM] = useState({ x: 50, y: 50 });
   return (
-    <section className="py-16 relative">
-      <div className="max-w-7xl mx-auto px-6">
+    <section className="py-10 sm:py-16 relative">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div
           ref={ref}
           onMouseMove={(e) => {
@@ -1023,7 +1054,7 @@ function CTABanner() {
             if (!r) return;
             setM({ x: ((e.clientX - r.left) / r.width) * 100, y: ((e.clientY - r.top) / r.height) * 100 });
           }}
-          className="relative rounded-3xl p-10 lg:p-14 overflow-hidden"
+          className="relative rounded-2xl sm:rounded-3xl p-6 sm:p-10 lg:p-14 overflow-hidden"
           style={{
             background: "linear-gradient(135deg, color-mix(in oklab, var(--cyan) 70%, var(--primary)), color-mix(in oklab, var(--primary) 80%, #6366f1))",
           }}
@@ -1044,12 +1075,12 @@ function CTABanner() {
             animate={{ x: [0, -20, 30, 0], y: [0, -15, 10, 0] }}
             transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
           />
-          <div className="relative flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+          <div className="relative flex flex-col md:flex-row items-start md:items-center justify-between gap-5 sm:gap-6">
             <div>
-              <h3 className="text-3xl md:text-4xl font-semibold tracking-tight text-white">Ship trust into every dispense.</h3>
-              <p className="text-white/85 mt-3 max-w-xl text-sm">Join hospitals, regulators, and manufacturers deploying MedChain AI in production today.</p>
+              <h3 className="text-2xl sm:text-3xl md:text-4xl font-semibold tracking-tight text-white">Ship trust into every dispense.</h3>
+              <p className="text-white/85 mt-2 sm:mt-3 max-w-xl text-xs sm:text-sm">Join hospitals, regulators, and manufacturers deploying MedChain AI in production today.</p>
             </div>
-            <div className="flex flex-wrap gap-3">
+            <div className="flex flex-wrap gap-2 sm:gap-3">
               <Link
                 to="/dashboard"
                 className="relative group overflow-hidden px-5 py-3 rounded-xl bg-background text-foreground font-medium inline-flex items-center gap-2"
@@ -1071,9 +1102,9 @@ function CTABanner() {
    ============================================================ */
 function Footer() {
   return (
-    <footer className="border-t border-border/60 pt-16 pb-10 relative">
-      <div className="max-w-7xl mx-auto px-6">
-        <div className="grid md:grid-cols-4 gap-10">
+    <footer className="border-t border-border/60 pt-12 sm:pt-16 pb-8 sm:pb-10 relative">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 sm:gap-10">
           <div>
             <div className="flex items-center gap-2 mb-4">
               <div className="h-7 w-7 rounded-lg gradient-primary grid place-items-center"><ShieldCheck className="h-3.5 w-3.5 text-primary-foreground" /></div>
@@ -1094,7 +1125,7 @@ function Footer() {
             </div>
           ))}
         </div>
-        <div className="mt-12 pt-6 border-t border-border/60 flex flex-wrap items-center justify-between gap-3 text-[10px] text-muted-foreground font-mono uppercase tracking-widest">
+        <div className="mt-8 sm:mt-12 pt-6 border-t border-border/60 flex flex-col sm:flex-row items-center justify-between gap-3 text-[9px] sm:text-[10px] text-muted-foreground font-mono uppercase tracking-widest">
           <div>© {new Date().getFullYear()} MedChain AI Systems · All rights reserved</div>
           <div className="flex gap-5"><a href="#">Privacy</a><a href="#">Terms</a><a href="#">Compliance</a></div>
         </div>

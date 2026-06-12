@@ -1,13 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
-import {
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut,
-  type User,
-} from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
-import { auth, db } from "@/lib/firebase";
+import type { User } from "firebase/auth";
 
 // ─── Admin email(s) — hardcoded, only these can access /admin ───
 const ADMIN_EMAILS = ["shobhitgupta19052005@gmail.com"];
@@ -38,57 +30,95 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [role, setRole] = useState<UserRole | null>(null);
   const [companyProfile, setCompanyProfile] = useState<CompanyProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isClient, setIsClient] = useState(false);
 
   const isAdmin = ADMIN_EMAILS.includes(user?.email ?? "");
 
+  // Only run Firebase logic on client
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (firebaseUser) => {
-      setUser(firebaseUser);
-      if (firebaseUser) {
-        // Check if admin
-        if (ADMIN_EMAILS.includes(firebaseUser.email ?? "")) {
-          setRole("admin");
-          setCompanyProfile(null);
-        } else {
-          // Check Firestore for user role
-          const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
-          if (userDoc.exists()) {
-            const data = userDoc.data();
-            setRole(data.role ?? "user");
+    setIsClient(true);
 
-            // If company, fetch company profile
-            if (data.role === "company") {
-              const companyDoc = await getDoc(doc(db, "companies", firebaseUser.uid));
-              if (companyDoc.exists()) {
-                setCompanyProfile(companyDoc.data() as CompanyProfile);
-              }
-            }
+    // Dynamic import to prevent SSR from pulling in Firebase
+    let unsub: (() => void) | undefined;
+
+    async function initAuth() {
+      const { onAuthStateChanged } = await import("firebase/auth");
+      const { getFirebaseAuth } = await import("@/lib/firebase");
+      const { doc, getDoc } = await import("firebase/firestore");
+      const { getFirebaseDb } = await import("@/lib/firebase");
+
+      const auth = getFirebaseAuth();
+      const db = getFirebaseDb();
+
+      unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+        setUser(firebaseUser);
+        if (firebaseUser) {
+          if (ADMIN_EMAILS.includes(firebaseUser.email ?? "")) {
+            setRole("admin");
+            setCompanyProfile(null);
           } else {
-            setRole("user");
+            try {
+              const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+              if (userDoc.exists()) {
+                const data = userDoc.data();
+                setRole(data.role ?? "user");
+
+                if (data.role === "company") {
+                  const companyDoc = await getDoc(doc(db, "companies", firebaseUser.uid));
+                  if (companyDoc.exists()) {
+                    setCompanyProfile(companyDoc.data() as CompanyProfile);
+                  }
+                }
+              } else {
+                setRole("user");
+              }
+            } catch {
+              setRole("user");
+            }
           }
+        } else {
+          setRole(null);
+          setCompanyProfile(null);
         }
-      } else {
-        setRole(null);
-        setCompanyProfile(null);
-      }
-      setLoading(false);
-    });
-    return unsub;
+        setLoading(false);
+      });
+    }
+
+    initAuth();
+
+    return () => {
+      if (unsub) unsub();
+    };
   }, []);
 
   async function login(email: string, password: string) {
-    await signInWithEmailAndPassword(auth, email, password);
+    const { signInWithEmailAndPassword } = await import("firebase/auth");
+    const { getFirebaseAuth } = await import("@/lib/firebase");
+    await signInWithEmailAndPassword(getFirebaseAuth(), email, password);
   }
 
   async function register(email: string, password: string) {
-    const cred = await createUserWithEmailAndPassword(auth, email, password);
+    const { createUserWithEmailAndPassword } = await import("firebase/auth");
+    const { getFirebaseAuth } = await import("@/lib/firebase");
+    const cred = await createUserWithEmailAndPassword(getFirebaseAuth(), email, password);
     return cred.user;
   }
 
   async function logout() {
-    await signOut(auth);
+    const { signOut } = await import("firebase/auth");
+    const { getFirebaseAuth } = await import("@/lib/firebase");
+    await signOut(getFirebaseAuth());
     setRole(null);
     setCompanyProfile(null);
+  }
+
+  // On server: render children immediately with loading state (no Firebase)
+  if (!isClient) {
+    return (
+      <AuthContext.Provider value={{ user: null, role: null, loading: true, isAdmin: false, companyProfile: null, login, register, logout }}>
+        {children}
+      </AuthContext.Provider>
+    );
   }
 
   return (
