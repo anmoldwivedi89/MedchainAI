@@ -36,13 +36,13 @@ function Register() {
     try {
       const user = await register(email, password);
 
-      // Dynamic import for Firestore (SSR safe)
-      const { doc, setDoc } = await import("firebase/firestore");
-      const { getFirebaseDb } = await import("@/lib/firebase");
-      const db = await getFirebaseDb();
+      // Save to Firestore via CDN-loaded Firebase
+      const { loadFirebase, getDb } = await import("@/lib/firebase");
+      await loadFirebase();
+      const db = getDb();
 
       // Save user doc in Firestore
-      await setDoc(doc(db, "users", user.uid), {
+      await db.collection("users").doc(user.uid).set({
         name,
         email,
         role,
@@ -51,7 +51,7 @@ function Register() {
 
       // If company, create company profile (unverified)
       if (role === "company") {
-        await setDoc(doc(db, "companies", user.uid), {
+        await db.collection("companies").doc(user.uid).set({
           companyName,
           email,
           verified: false,

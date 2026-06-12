@@ -41,13 +41,12 @@ function Page() {
 
   async function fetchBPOs() {
     try {
-      const { collection, getDocs, query, where } = await import("firebase/firestore");
-      const { getFirebaseDb } = await import("@/lib/firebase");
-      const db = await getFirebaseDb();
-      const q = query(collection(db, "bpo_officers"), where("companyId", "==", user!.uid));
-      const snap = await getDocs(q);
+      const { loadFirebase, getDb } = await import("@/lib/firebase");
+      await loadFirebase();
+      const db = getDb();
+      const snap = await db.collection("bpo_officers").where("companyId", "==", user!.uid).get();
       const officers: BPO[] = [];
-      snap.forEach((d) => {
+      snap.forEach((d: any) => {
         const data = d.data();
         officers.push({
           id: d.id,
@@ -71,10 +70,10 @@ function Page() {
     if (!bpoForm.name || !bpoForm.email || !bpoForm.region) return;
     setAddingBPO(true);
     try {
-      const { collection, addDoc } = await import("firebase/firestore");
-      const { getFirebaseDb } = await import("@/lib/firebase");
-      const db = await getFirebaseDb();
-      const docRef = await addDoc(collection(db, "bpo_officers"), {
+      const { loadFirebase, getDb } = await import("@/lib/firebase");
+      await loadFirebase();
+      const db = getDb();
+      const docRef = await db.collection("bpo_officers").add({
         ...bpoForm,
         companyId: user!.uid,
         addedAt: new Date().toISOString(),
@@ -91,10 +90,10 @@ function Page() {
 
   async function removeBPO(bpoId: string) {
     try {
-      const { doc, deleteDoc } = await import("firebase/firestore");
-      const { getFirebaseDb } = await import("@/lib/firebase");
-      const db = await getFirebaseDb();
-      await deleteDoc(doc(db, "bpo_officers", bpoId));
+      const { loadFirebase, getDb } = await import("@/lib/firebase");
+      await loadFirebase();
+      const db = getDb();
+      await db.collection("bpo_officers").doc(bpoId).delete();
       setBpoList((prev) => prev.filter((b) => b.id !== bpoId));
     } catch (err) {
       console.error("Error removing BPO:", err);

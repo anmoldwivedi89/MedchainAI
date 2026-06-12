@@ -38,13 +38,12 @@ function Page() {
 
   async function fetchPendingCompanies() {
     try {
-      const { collection, getDocs, query, where } = await import("firebase/firestore");
-      const { getFirebaseDb } = await import("@/lib/firebase");
-      const db = await getFirebaseDb();
-      const q = query(collection(db, "companies"), where("verified", "==", false));
-      const snap = await getDocs(q);
+      const { loadFirebase, getDb } = await import("@/lib/firebase");
+      await loadFirebase();
+      const db = getDb();
+      const snap = await db.collection("companies").where("verified", "==", false).get();
       const companies: PendingCompany[] = [];
-      snap.forEach((d) => {
+      snap.forEach((d: any) => {
         const data = d.data();
         companies.push({
           id: d.id,
@@ -63,10 +62,10 @@ function Page() {
 
   async function approveCompany(companyId: string) {
     try {
-      const { doc, updateDoc } = await import("firebase/firestore");
-      const { getFirebaseDb } = await import("@/lib/firebase");
-      const db = await getFirebaseDb();
-      await updateDoc(doc(db, "companies", companyId), { verified: true });
+      const { loadFirebase, getDb } = await import("@/lib/firebase");
+      await loadFirebase();
+      const db = getDb();
+      await db.collection("companies").doc(companyId).update({ verified: true });
       setPendingCompanies((prev) => prev.filter((c) => c.id !== companyId));
     } catch (err) {
       console.error("Error approving company:", err);
@@ -75,10 +74,10 @@ function Page() {
 
   async function rejectCompany(companyId: string) {
     try {
-      const { doc, updateDoc } = await import("firebase/firestore");
-      const { getFirebaseDb } = await import("@/lib/firebase");
-      const db = await getFirebaseDb();
-      await updateDoc(doc(db, "companies", companyId), { verified: false, rejected: true });
+      const { loadFirebase, getDb } = await import("@/lib/firebase");
+      await loadFirebase();
+      const db = getDb();
+      await db.collection("companies").doc(companyId).update({ verified: false, rejected: true });
       setPendingCompanies((prev) => prev.filter((c) => c.id !== companyId));
     } catch (err) {
       console.error("Error rejecting company:", err);

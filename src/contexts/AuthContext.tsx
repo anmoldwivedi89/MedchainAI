@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import { loadFirebase, getAuth, getDb } from "@/lib/firebase";
 
 // ─── Admin email(s) — hardcoded, only these can access /admin ───
 const ADMIN_EMAILS = ["shobhitgupta19052005@gmail.com"];
@@ -42,36 +43,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isAdmin = ADMIN_EMAILS.includes(user?.email ?? "");
 
   useEffect(() => {
-    // Skip on server
     if (typeof window === "undefined") {
       setLoading(false);
       return;
     }
 
-    let unsub: (() => void) | undefined;
+    let unsubscribe: (() => void) | undefined;
     let mounted = true;
 
     (async () => {
       try {
-        const { initializeApp, getApps } = await import("firebase/app");
-        const { getAuth, onAuthStateChanged } = await import("firebase/auth");
-        const { getFirestore, doc, getDoc } = await import("firebase/firestore");
+        await loadFirebase();
+        const auth = getAuth();
+        const db = getDb();
 
-        const firebaseConfig = {
-          apiKey: "AIzaSyBWRYCcldUcjekGUyUAcqRikPZkvcfaGhA",
-          authDomain: "medchain-f3170.firebaseapp.com",
-          projectId: "medchain-f3170",
-          storageBucket: "medchain-f3170.firebasestorage.app",
-          messagingSenderId: "20546639083",
-          appId: "1:20546639083:web:02210ca1e5b4cde4b71aae",
-          measurementId: "G-PEZWTFB7C1",
-        };
-
-        const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-
-        unsub = onAuthStateChanged(auth, async (firebaseUser) => {
+        unsubscribe = auth.onAuthStateChanged(async (firebaseUser: any) => {
           if (!mounted) return;
 
           if (firebaseUser) {
@@ -83,14 +69,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               setCompanyProfile(null);
             } else {
               try {
-                const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
-                if (userDoc.exists()) {
+                const userDoc = await db.collection("users").doc(firebaseUser.uid).get();
+                if (userDoc.exists) {
                   const data = userDoc.data();
                   setRole(data.role ?? "user");
 
                   if (data.role === "company") {
-                    const companyDoc = await getDoc(doc(db, "companies", firebaseUser.uid));
-                    if (companyDoc.exists()) {
+                    const companyDoc = await db.collection("companies").doc(firebaseUser.uid).get();
+                    if (companyDoc.exists) {
                       setCompanyProfile(companyDoc.data() as CompanyProfile);
                     }
                   }
@@ -116,57 +102,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     return () => {
       mounted = false;
-      if (unsub) unsub();
+      if (unsubscribe) unsubscribe();
     };
   }, []);
 
   async function login(email: string, password: string) {
-    const { initializeApp, getApps } = await import("firebase/app");
-    const { getAuth, signInWithEmailAndPassword } = await import("firebase/auth");
-    const firebaseConfig = {
-      apiKey: "AIzaSyBWRYCcldUcjekGUyUAcqRikPZkvcfaGhA",
-      authDomain: "medchain-f3170.firebaseapp.com",
-      projectId: "medchain-f3170",
-      storageBucket: "medchain-f3170.firebasestorage.app",
-      messagingSenderId: "20546639083",
-      appId: "1:20546639083:web:02210ca1e5b4cde4b71aae",
-    };
-    const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-    const auth = getAuth(app);
-    await signInWithEmailAndPassword(auth, email, password);
+    await loadFirebase();
+    await getAuth().signInWithEmailAndPassword(email, password);
   }
 
   async function register(email: string, password: string) {
-    const { initializeApp, getApps } = await import("firebase/app");
-    const { getAuth, createUserWithEmailAndPassword } = await import("firebase/auth");
-    const firebaseConfig = {
-      apiKey: "AIzaSyBWRYCcldUcjekGUyUAcqRikPZkvcfaGhA",
-      authDomain: "medchain-f3170.firebaseapp.com",
-      projectId: "medchain-f3170",
-      storageBucket: "medchain-f3170.firebasestorage.app",
-      messagingSenderId: "20546639083",
-      appId: "1:20546639083:web:02210ca1e5b4cde4b71aae",
-    };
-    const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-    const auth = getAuth(app);
-    const cred = await createUserWithEmailAndPassword(auth, email, password);
+    await loadFirebase();
+    const cred = await getAuth().createUserWithEmailAndPassword(email, password);
     return { uid: cred.user.uid, email: cred.user.email };
   }
 
   async function logout() {
-    const { initializeApp, getApps } = await import("firebase/app");
-    const { getAuth, signOut } = await import("firebase/auth");
-    const firebaseConfig = {
-      apiKey: "AIzaSyBWRYCcldUcjekGUyUAcqRikPZkvcfaGhA",
-      authDomain: "medchain-f3170.firebaseapp.com",
-      projectId: "medchain-f3170",
-      storageBucket: "medchain-f3170.firebasestorage.app",
-      messagingSenderId: "20546639083",
-      appId: "1:20546639083:web:02210ca1e5b4cde4b71aae",
-    };
-    const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-    const auth = getAuth(app);
-    await signOut(auth);
+    await loadFirebase();
+    await getAuth().signOut();
     setUser(null);
     setRole(null);
     setCompanyProfile(null);
