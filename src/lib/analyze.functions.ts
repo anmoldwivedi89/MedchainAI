@@ -276,27 +276,28 @@ No markdown, no commentary, JSON only.`;
     const mimeType = mimeMatch?.[1] || "image/jpeg";
     const base64Data = mimeMatch?.[2] || data.imageDataUrl.replace(/^data:image\/[a-z+]+;base64,/i, "");
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
 
     try {
+      const requestBody = {
+        contents: [
+          {
+            parts: [
+              { text: systemPrompt + "\n\nAnalyze this image. Verbatim OCR first, then structured fields, then packaging analysis. JSON only." },
+              { inlineData: { mimeType, data: base64Data } },
+            ],
+          },
+        ],
+        generationConfig: {
+          maxOutputTokens: 3000,
+          temperature: 0.2,
+        },
+      };
+
       const res = await fetch(geminiUrl, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                { text: systemPrompt + "\n\nAnalyze this image. Verbatim OCR first, then structured fields, then packaging analysis. JSON only." },
-                { inlineData: { mimeType, data: base64Data } },
-              ],
-            },
-          ],
-          generationConfig: {
-            maxOutputTokens: 3000,
-            temperature: 0.2,
-            responseMimeType: "application/json",
-          },
-        }),
+        body: JSON.stringify(requestBody),
       });
       if (!res.ok) {
         pipelineLog("gemini", "error", `Gemini API returned ${res.status}`, { status: res.status });
