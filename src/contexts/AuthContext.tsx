@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { loadFirebase, getAuth, getDb } from "@/lib/firebase";
 
 // ─── Admin email(s) — hardcoded, only these can access /admin ───
-const ADMIN_EMAILS = ["shobhitgupta19052005@gmail.com"];
+const ADMIN_EMAILS = ["anmoldwivedi2002@gmail.com"];
 
 export type UserRole = "admin" | "company" | "pharmacy" | "user";
 

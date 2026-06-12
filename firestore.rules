@@ -5,7 +5,7 @@ service cloud.firestore {
 
     // ─── Admin email — only this email has admin privileges ───
     function isAdmin() {
-      return request.auth != null && request.auth.token.email == "shobhitgupta19052005@gmail.com";
+      return request.auth != null && request.auth.token.email == "anmoldwivedi2002@gmail.com";
     }
 
     function isOwner(userId) {
