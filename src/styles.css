@@ -109,6 +109,8 @@
 .dark { color-scheme: dark; }
 
 @layer base {
+  *, *::before, *::after { box-sizing: border-box; }
+  img, video, svg, canvas { max-width: 100%; height: auto; }
   * { border-color: var(--color-border); }
   html { font-family: var(--font-sans); }
   body {

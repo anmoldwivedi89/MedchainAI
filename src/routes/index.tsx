@@ -146,6 +146,23 @@ function AmbientBackground() {
    ============================================================ */
 function Nav() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const close = () => setMobileOpen(false);
+
+  // ESC key to close
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [mobileOpen]);
+
+  // Lock body scroll
+  useEffect(() => {
+    if (mobileOpen) document.body.style.overflow = "hidden";
+    else document.body.style.overflow = "";
+    return () => { document.body.style.overflow = ""; };
+  }, [mobileOpen]);
+
   return (
     <header className="sticky top-0 z-50 border-b border-border/60 bg-background/70 backdrop-blur-xl">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-14 sm:h-16 flex items-center">
@@ -169,33 +186,56 @@ function Nav() {
           {/* Mobile menu button */}
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
-            className="md:hidden h-9 w-9 grid place-items-center rounded-lg border border-border"
+            className="md:hidden h-10 w-10 grid place-items-center rounded-lg border border-border"
             aria-label="Toggle menu"
           >
-            {mobileOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
+            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
         </div>
       </div>
-      {/* Mobile dropdown */}
+      {/* Mobile full-screen drawer */}
       <AnimatePresence>
         {mobileOpen && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.25 }}
-            className="md:hidden overflow-hidden border-t border-border/60 bg-background/95 backdrop-blur-xl"
-          >
-            <div className="px-4 py-4 space-y-3">
-              <a href="#how" onClick={() => setMobileOpen(false)} className="block text-sm text-muted-foreground hover:text-foreground py-2">How it works</a>
-              <a href="#features" onClick={() => setMobileOpen(false)} className="block text-sm text-muted-foreground hover:text-foreground py-2">Platform</a>
-              <a href="#blockchain" onClick={() => setMobileOpen(false)} className="block text-sm text-muted-foreground hover:text-foreground py-2">Blockchain</a>
-              <a href="#faq" onClick={() => setMobileOpen(false)} className="block text-sm text-muted-foreground hover:text-foreground py-2">FAQ</a>
-              <Link to="/verify" onClick={() => setMobileOpen(false)} className="block text-sm font-medium px-4 py-2.5 rounded-lg gradient-primary text-primary-foreground text-center">
-                Verify Medicine
-              </Link>
-            </div>
-          </motion.div>
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"
+              onClick={close}
+            />
+            <motion.div
+              initial={{ x: "100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "100%" }}
+              transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+              className="fixed inset-y-0 right-0 w-72 max-w-[85vw] z-50 bg-background/95 backdrop-blur-xl border-l border-border flex flex-col md:hidden safe-top"
+            >
+              <div className="flex items-center justify-between px-4 h-14 border-b border-border shrink-0">
+                <span className="font-semibold text-sm">Menu</span>
+                <button onClick={close} className="h-10 w-10 grid place-items-center rounded-lg hover:bg-sidebar-accent" aria-label="Close menu">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-4 space-y-1">
+                <a href="#how" onClick={close} className="block text-sm text-muted-foreground hover:text-foreground py-3 px-3 rounded-lg hover:bg-sidebar-accent/60 transition-colors">How it works</a>
+                <a href="#features" onClick={close} className="block text-sm text-muted-foreground hover:text-foreground py-3 px-3 rounded-lg hover:bg-sidebar-accent/60 transition-colors">Platform</a>
+                <a href="#blockchain" onClick={close} className="block text-sm text-muted-foreground hover:text-foreground py-3 px-3 rounded-lg hover:bg-sidebar-accent/60 transition-colors">Blockchain</a>
+                <a href="#faq" onClick={close} className="block text-sm text-muted-foreground hover:text-foreground py-3 px-3 rounded-lg hover:bg-sidebar-accent/60 transition-colors">FAQ</a>
+
+                <div className="pt-3 pb-2 px-3 text-[10px] uppercase tracking-widest text-muted-foreground">Quick Links</div>
+                <Link to="/dashboard" onClick={close} className="block text-sm text-muted-foreground hover:text-foreground py-3 px-3 rounded-lg hover:bg-sidebar-accent/60 transition-colors">Dashboard</Link>
+                <Link to="/login" onClick={close} className="block text-sm text-muted-foreground hover:text-foreground py-3 px-3 rounded-lg hover:bg-sidebar-accent/60 transition-colors">Sign In</Link>
+                <Link to="/register" onClick={close} className="block text-sm text-muted-foreground hover:text-foreground py-3 px-3 rounded-lg hover:bg-sidebar-accent/60 transition-colors">Sign Up</Link>
+              </div>
+              <div className="p-4 safe-bottom shrink-0">
+                <Link to="/verify" onClick={close} className="block text-sm font-semibold px-4 py-3 rounded-xl gradient-primary text-primary-foreground text-center">
+                  Verify Medicine
+                </Link>
+              </div>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
     </header>

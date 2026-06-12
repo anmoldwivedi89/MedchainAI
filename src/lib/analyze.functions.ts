@@ -1,4 +1,20 @@
 import { createServerFn } from "@tanstack/react-start";
+import {
+  analyzePackaging,
+  assessFraudIntelligence,
+  computeTrustScore,
+  generateBlockchainRecord,
+  computeRiskAssessment,
+  matchMedicineDatabase,
+  pipelineLog,
+  type PackagingAnalysis,
+  type FraudIntelligence,
+  type TrustScore,
+  type BlockchainRecord,
+  type RiskAssessment,
+  type DatabaseMatch,
+  type VerificationMeta,
+} from "./verification-engine";
 
 export type AnalyzeResult = {
   isMedicine: boolean;
@@ -53,6 +69,15 @@ export type AnalyzeResult = {
     title: string;
     message: string;
   };
+
+  // ── Enhanced pipeline fields ──
+  packaging?: PackagingAnalysis;
+  fraudIntelligence?: FraudIntelligence;
+  trustInfo?: TrustScore;
+  blockchain?: BlockchainRecord;
+  risk?: RiskAssessment;
+  databaseMatch?: DatabaseMatch;
+  verificationMeta?: VerificationMeta;
 };
 
 const FIELD_KEYS = [
@@ -128,14 +153,15 @@ function daysUntil(dateStr: string): number | undefined {
   if (!dateStr) return undefined;
   const s = dateStr.trim();
   // mm/yyyy or mm-yyyy
-  let m = s.match(/^(\d{1,2})[\/\-.](\d{4})$/);
+  let m = s.match(/^(\d{1,2})[\/\-.](\\d{4})$/);
   let y: number | undefined, mo: number | undefined;
+  if (!m) m = s.match(/^(\d{1,2})[\/\-.](\d{4})$/);
   if (m) { mo = +m[1]; y = +m[2]; }
   m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
   if (!y && m) {
     mo = +m[2]; y = +m[3] < 100 ? 2000 + +m[3] : +m[3];
   }
-  m = s.match(/^([a-z]{3,9})[\s\-\/.](\d{2,4})$/i);
+  m = s.match(/^([a-z]{3,9})[\s\-\/.] ?(\d{2,4})$/i);
   if (!y && m) {
     const idx = ["jan","feb","mar","apr","may","jun","jul","aug","sep","oct","nov","dec"]
       .indexOf(m[1].slice(0,3).toLowerCase());
@@ -159,13 +185,24 @@ export const analyzeMedicineImage = createServerFn({ method: "POST" })
     return input;
   })
   .handler(async ({ data }): Promise<AnalyzeResult> => {
+    const pipelineStart = performance.now();
+    pipelineLog("init", "info", "Verification pipeline started");
+
+    // ── Environment validation ──
     const apiKey = process.env.GEMINI_API_KEY || process.env.LOVABLE_API_KEY;
     if (!apiKey) {
+      pipelineLog("init", "error", "Missing API key", { 
+        hasGemini: !!process.env.GEMINI_API_KEY,
+        hasLovable: !!process.env.LOVABLE_API_KEY,
+      });
       return notMedicineEnvelope(
-        "Verification service unavailable",
-        "Our verification engine is temporarily offline. Please try again shortly.",
+        "Gemini API Key Missing",
+        "Gemini API key missing. Please configure GEMINI_API_KEY in your environment variables. You can obtain one from Google AI Studio at aistudio.google.com/apikey.",
       );
     }
+
+    // ── Stage 1: OCR + AI Analysis via Gemini ──
+    pipelineLog("ocr", "info", "Sending image to Gemini for OCR and analysis");
 
     const systemPrompt = `You are MedChain AI's medicine OCR + pharmaceutical packaging verifier.
 
@@ -177,16 +214,30 @@ STEP 2 — Verbatim OCR. Transcribe every readable printed character on the pack
 
 STEP 3 — Structured extraction. Using ONLY tokens that actually appear in rawText, fill the fields below. If a value is not literally on the pack, OMIT the field. No placeholders, no guesses, no defaults like "BATCH123" or "12/2025".
 
+STEP 4 — Packaging Analysis. Analyze the visual quality of the packaging for signs of counterfeiting:
+- printQuality: 0-100 score for print clarity, color consistency, alignment
+- labelConsistency: 0-100 score for label alignment, consistent fonts, proper spacing
+- tamperingDetected: boolean — any visible signs of tampering, resealing, or damage
+- tamperingIndicators: string[] — specific observations about suspicious elements
+- missingElements: string[] — standard packaging elements that are missing (e.g., "batch number", "expiry date", "hologram")
+- packageIntegrity: "Intact" | "Damaged" | "Suspicious"
+- packagingScore: 0-100 overall packaging quality score
+
+STEP 5 — Authenticity Assessment. Based on all observations:
+- authenticityScore: 0-100 (how likely this is a genuine medicine)
+- reasoning: string[] — specific evidence-based reasons for the score
+- warnings: string[] — any concerns or red flags
+
 Return ONLY this JSON:
 {
   "isMedicine": boolean,
-  "confidence": number,                  // 0-100 overall visual+OCR confidence
-  "detectionConfidence"?: number,        // 0-100 confidence the image is medicine
-  "textConfidence"?: number,             // 0-100 OCR text recognition confidence
-  "fieldConfidence"?: number,            // 0-100 structured field extraction confidence
-  "description": string,                 // 1-2 sentence plain description of what you see
-  "detectedObject": string,              // short label e.g. "Calpol 500 tablet strip", "selfie"
-  "rawText": string,                     // verbatim OCR (empty string if nothing readable)
+  "confidence": number,
+  "detectionConfidence"?: number,
+  "textConfidence"?: number,
+  "fieldConfidence"?: number,
+  "description": string,
+  "detectedObject": string,
+  "rawText": string,
   "medicineName"?: string,
   "brandName"?: string,
   "genericName"?: string,
@@ -194,67 +245,93 @@ Return ONLY this JSON:
   "composition"?: string,
   "dosage"?: string,
   "packSize"?: string,
-  "batchNumber"?: string,                // value next to "Batch No / B.No / LOT / BN"
-  "manufacturingDate"?: string,          // value next to "MFG / MFD / Mfg Date"
-  "expiryDate"?: string,                 // value next to "EXP / Use Before / Valid Till"
-  "mrp"?: string,                        // include currency symbol if printed
+  "batchNumber"?: string,
+  "manufacturingDate"?: string,
+  "expiryDate"?: string,
+  "mrp"?: string,
   "serialNumber"?: string,
   "licenseNumber"?: string,
   "barcode"?: string,
   "qrCode"?: string,
   "storageInstructions"?: string,
-  "scheduleType"?: string,               // e.g. "Schedule H", "Rx", "OTC"
+  "scheduleType"?: string,
   "countryOfManufacture"?: string,
   "authenticityScore"?: number,
   "reasoning"?: string[],
-  "warnings"?: string[]
+  "warnings"?: string[],
+  "packagingScore"?: number,
+  "printQuality"?: number,
+  "labelConsistency"?: number,
+  "tamperingDetected"?: boolean,
+  "tamperingIndicators"?: string[],
+  "missingElements"?: string[],
+  "packageIntegrity"?: string
 }
 No markdown, no commentary, JSON only.`;
 
     let aiJson: any = null;
     let httpError: string | null = null;
+    // Extract base64 data and MIME type from data URL
+    const mimeMatch = data.imageDataUrl.match(/^data:(image\/[a-z+]+);base64,(.+)$/i);
+    const mimeType = mimeMatch?.[1] || "image/jpeg";
+    const base64Data = mimeMatch?.[2] || data.imageDataUrl.replace(/^data:image\/[a-z+]+;base64,/i, "");
+
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+
     try {
-      const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const res = await fetch(geminiUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "google/gemini-2.5-flash",
-          max_tokens: 2500,
-          messages: [
-            { role: "system", content: systemPrompt },
+          contents: [
             {
-              role: "user",
-              content: [
-                { type: "text", text: "Analyze this image. Verbatim OCR first, then structured fields. JSON only." },
-                { type: "image_url", image_url: { url: data.imageDataUrl } },
+              parts: [
+                { text: systemPrompt + "\n\nAnalyze this image. Verbatim OCR first, then structured fields, then packaging analysis. JSON only." },
+                { inlineData: { mimeType, data: base64Data } },
               ],
             },
           ],
+          generationConfig: {
+            maxOutputTokens: 3000,
+            temperature: 0.2,
+          },
         }),
       });
       if (!res.ok) {
-        if (res.status === 429) httpError = "We're processing too many scans right now. Please retry in a moment.";
-        else if (res.status === 402) httpError = "Verification credits are exhausted. Please contact the administrator.";
-        else httpError = "We couldn't complete the analysis. Please try a clearer photo.";
+        pipelineLog("gemini", "error", `Gemini API returned ${res.status}`, { status: res.status });
+        if (res.status === 429) httpError = "Too many scan requests. Please wait a moment and try again.";
+        else if (res.status === 401 || res.status === 403) httpError = "The API key is invalid or expired. Please check your GEMINI_API_KEY.";
+        else if (res.status === 503 || res.status === 500) httpError = "The Gemini AI service is temporarily unavailable. Please try again in a few minutes.";
+        else httpError = `Failed to analyze image (HTTP ${res.status}). Please try again with a clearer photo.`;
       } else {
         aiJson = await res.json();
+        pipelineLog("gemini", "info", "Gemini response received", { 
+          finishReason: aiJson?.candidates?.[0]?.finishReason,
+          hasContent: !!aiJson?.candidates?.[0]?.content?.parts?.[0]?.text,
+        });
       }
-    } catch {
-      httpError = "Network issue while contacting the verification engine. Please try again.";
+    } catch (e: any) {
+      pipelineLog("gemini", "error", "Network error contacting Gemini", { error: e?.message });
+      httpError = "Gemini request timeout. Check your internet connection and try again.";
     }
 
     if (httpError) {
-      return notMedicineEnvelope("Unable to analyse image", httpError);
+      return notMedicineEnvelope("Unable to Analyse Image", httpError);
     }
 
-    const finish = aiJson?.choices?.[0]?.finish_reason;
-    const raw: string = aiJson?.choices?.[0]?.message?.content ?? "";
+    const finish = aiJson?.candidates?.[0]?.finishReason;
+    const raw: string = aiJson?.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
     const parsed = tryParseJSON(raw);
 
-    if (!parsed || finish === "length") {
+    if (!parsed || finish === "MAX_TOKENS") {
+      pipelineLog("parse", "error", "Failed to parse Gemini response", { 
+        finishReason: finish,
+        rawLength: raw.length,
+        rawPreview: raw.slice(0, 200),
+      });
       return notMedicineEnvelope(
-        "Unable to Detect a Medicine",
-        "We couldn't identify a medicine package in the uploaded image. Please upload a clear photo of a medicine strip, box, bottle, or pharmaceutical label.",
+        "OCR Extraction Failed",
+        "OCR extraction failed. The AI could not generate a complete analysis for this image. Please try again with a clearer, well-lit photo of the medicine packaging.",
       );
     }
 
@@ -263,6 +340,10 @@ No markdown, no commentary, JSON only.`;
 
     const isMedicine = !!parsed.isMedicine;
     if (!isMedicine) {
+      pipelineLog("detect", "info", "Image not identified as medicine", { 
+        detectedObject: parsed.detectedObject,
+        confidence: parsed.confidence,
+      });
       return {
         isMedicine: false,
         confidence: clamp(parsed.confidence),
@@ -276,7 +357,9 @@ No markdown, no commentary, JSON only.`;
       };
     }
 
-    // Collect & validate structured fields against rawText
+    // ── Stage 2: Field Validation ──
+    pipelineLog("fields", "info", "Validating extracted fields against rawText");
+
     const validated: Record<string, string | undefined> = {};
     let dropped = 0;
     for (const k of FIELD_KEYS) {
@@ -312,9 +395,93 @@ No markdown, no commentary, JSON only.`;
     if (expiryDaysRemaining != null && expiryDaysRemaining < 0) warnings.unshift("This pack appears to be EXPIRED.");
     else if (expiryDaysRemaining != null && expiryDaysRemaining < 60) warnings.unshift(`Expires in ${expiryDaysRemaining} days.`);
 
+    const ocrConfidence = clamp(parsed.confidence);
+    const filledFieldCount = Object.values(validated).filter(Boolean).length;
+
+    // ── Stage 3: Packaging Analysis ──
+    pipelineLog("packaging", "info", "Running packaging analysis");
+    const packaging = analyzePackaging(
+      {
+        packagingScore: parsed.packagingScore,
+        printQuality: parsed.printQuality,
+        labelConsistency: parsed.labelConsistency,
+        tamperingDetected: parsed.tamperingDetected,
+        tamperingIndicators: Array.isArray(parsed.tamperingIndicators) ? parsed.tamperingIndicators : undefined,
+        missingElements: Array.isArray(parsed.missingElements) ? parsed.missingElements : undefined,
+        packageIntegrity: parsed.packageIntegrity,
+      },
+      filledFieldCount,
+      FIELD_KEYS.length,
+      warnings,
+    );
+
+    // ── Stage 4: Medicine Database Matching ──
+    pipelineLog("match", "info", "Matching against medicine database");
+    const databaseMatch = matchMedicineDatabase(validated.medicineName, validated.manufacturer);
+
+    // ── Stage 5: Fraud Intelligence ──
+    pipelineLog("fraud", "info", "Running fraud intelligence assessment");
+    const fraudIntelligence = assessFraudIntelligence(
+      validated.medicineName,
+      validated.batchNumber,
+      validated.manufacturer,
+      ocrConfidence,
+      packaging.packagingScore,
+    );
+
+    // ── Stage 6: Trust Score ──
+    pipelineLog("trust", "info", "Computing trust score");
+    const trustInfo = computeTrustScore(
+      ocrConfidence,
+      packaging.packagingScore,
+      fraudIntelligence.fraudRisk,
+      validated.batchNumber,
+      validated.manufacturer,
+    );
+
+    // ── Stage 7: Blockchain Record ──
+    pipelineLog("blockchain", "info", "Generating blockchain verification record");
+    const blockchain = await generateBlockchainRecord(
+      validated.medicineName,
+      validated.batchNumber,
+      validated.manufacturer,
+      ocrConfidence,
+      0, // riskScore — computed next
+    );
+
+    // ── Stage 8: Risk Assessment ──
+    pipelineLog("risk", "info", "Computing final risk assessment");
+    const risk = computeRiskAssessment(
+      ocrConfidence,
+      packaging.packagingScore,
+      blockchain.blockchainVerified,
+      fraudIntelligence.fraudRisk,
+      fraudIntelligence.counterfeitProbability,
+      trustInfo.trustScore,
+      validated.batchNumber,
+      expiryDaysRemaining,
+    );
+
+    const pipelineDuration = Math.round(performance.now() - pipelineStart);
+
+    const verificationMeta: VerificationMeta = {
+      verificationId: blockchain.verificationId,
+      verificationTimestamp: blockchain.verificationTimestamp,
+      pipelineDuration,
+    };
+
+    pipelineLog("complete", "info", "Verification pipeline complete", {
+      verificationId: blockchain.verificationId,
+      duration: pipelineDuration,
+      riskLevel: risk.riskLevel,
+      riskScore: risk.riskScore,
+      authenticityScore: parsed.authenticityScore,
+      trustScore: trustInfo.trustScore,
+    });
+
     return {
       isMedicine: true,
-      confidence: clamp(parsed.confidence),
+      confidence: ocrConfidence,
       description: parsed.description || "",
       detectedObject: parsed.detectedObject,
       rawText,
@@ -332,6 +499,14 @@ No markdown, no commentary, JSON only.`;
             ? "Several extracted fields did not match the visible text"
             : "Low OCR confidence"
         : undefined,
+      // Enhanced pipeline results
+      packaging,
+      fraudIntelligence,
+      trustInfo,
+      blockchain,
+      risk,
+      databaseMatch,
+      verificationMeta,
     };
   });
 

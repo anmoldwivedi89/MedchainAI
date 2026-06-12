@@ -18,6 +18,13 @@ service cloud.firestore {
       allow create: if isOwner(userId);
       allow update: if isOwner(userId) || isAdmin();
       allow delete: if isAdmin();
+
+      // Scan history subcollection — user can manage own, admin can read all
+      match /scanHistory/{scanId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow create, update: if isOwner(userId);
+        allow delete: if isOwner(userId) || isAdmin();
+      }
     }
 
     // Companies collection — company owner can read own, admin can read/update all

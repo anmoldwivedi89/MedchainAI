@@ -138,7 +138,7 @@ function Login() {
               {password.length > 0 && <PasswordStrength score={pwStrength} />}
             </div>
 
-            <div className="flex items-center justify-between text-xs">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs">
               <label className="inline-flex items-center gap-2 text-muted-foreground cursor-pointer">
                 <input type="checkbox" className="h-3.5 w-3.5 rounded border-border bg-card" />
                 Remember me
@@ -310,7 +310,7 @@ function RoleTabs({ role, setRole }: { role: string; setRole: (r: any) => void }
     }
   }, [role]);
   return (
-    <div ref={ref} className="relative grid grid-cols-4 gap-1 mt-6 rounded-xl border border-border p-1 bg-card/60">
+    <div ref={ref} className="relative grid grid-cols-2 sm:grid-cols-4 gap-1 mt-6 rounded-xl border border-border p-1 bg-card/60">
       {rect && (
         <motion.div
           layout
@@ -368,7 +368,7 @@ function PremiumField({
           onChange={(e) => onChange(e.target.value)}
           onFocus={() => setFocus(true)}
           onBlur={() => setFocus(false)}
-          className="flex-1 bg-transparent outline-none text-sm placeholder:text-muted-foreground/60"
+          className="flex-1 bg-transparent outline-none text-sm placeholder:text-muted-foreground/60 min-w-0"
         />
         {valid === true && <CheckCircle2 className="h-4 w-4 text-emerald" />}
         {trailing}

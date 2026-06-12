@@ -6,11 +6,14 @@ import {
   Brain, Boxes, Shield, AlertTriangle, Sparkles, X, RotateCw, XCircle,
   ZoomIn, ZoomOut, RotateCcw, Maximize2, Copy, ExternalLink, Download,
   FileText, MapPin, BadgeCheck, Search, History as HistoryIcon, Flag,
-  ChevronDown, Cpu, Lock, Send,
+  ChevronDown, Cpu, Lock, Send, Package, ShieldAlert, TrendingDown,
+  Database, Fingerprint, Eye, Activity, BarChart3, Scale,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { pharmacies } from "@/lib/mock";
 import { analyzeMedicineImage, type AnalyzeResult } from "@/lib/analyze.functions";
+import { saveScan, loadScanHistory, type ScanRecord } from "@/lib/scan-history";
+import { useAuth } from "@/contexts/AuthContext";
 import { useServerFn } from "@tanstack/react-start";
 import jsPDF from "jspdf";
 
@@ -38,7 +41,7 @@ const PIPELINE: { key: StageKey; label: string; icon: any; ms: number }[] = [
 ];
 
 /* ============================================================
-   Scan history (localStorage)
+   Scan history (Firestore + localStorage via scan-history module)
    ============================================================ */
 type HistoryEntry = {
   id: string;
@@ -50,15 +53,6 @@ type HistoryEntry = {
   thumb: string;
   status: string;
 };
-const HISTORY_KEY = "medchain.scanHistory.v1";
-function loadHistory(): HistoryEntry[] {
-  if (typeof window === "undefined") return [];
-  try { return JSON.parse(localStorage.getItem(HISTORY_KEY) || "[]"); } catch { return []; }
-}
-function saveHistoryEntry(e: HistoryEntry) {
-  const cur = loadHistory();
-  localStorage.setItem(HISTORY_KEY, JSON.stringify([e, ...cur].slice(0, 20)));
-}
 
 /* ============================================================
    Main component
@@ -80,9 +74,24 @@ function Verify() {
   const streamRef = useRef<MediaStream | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const dragRef = useRef<HTMLDivElement | null>(null);
+  const { user } = useAuth();
   const analyze = useServerFn(analyzeMedicineImage);
 
-  useEffect(() => { setHistory(loadHistory()); }, []);
+  // Load scan history on mount (async — supports Firestore)
+  useEffect(() => {
+    loadScanHistory(user?.uid).then(records => {
+      setHistory(records.map(r => ({
+        id: r.verificationId,
+        date: r.timestamp,
+        name: r.medicineName || "Unknown",
+        manufacturer: r.manufacturer,
+        batch: undefined,
+        score: r.authenticityScore,
+        thumb: r.imageUrl,
+        status: r.status || "Unknown",
+      })));
+    });
+  }, [user?.uid]);
   useEffect(() => () => stopCamera(), []);
 
   /* -------- Camera -------- */
@@ -167,7 +176,6 @@ function Verify() {
     // Run pipeline stages while AI call is in-flight; min-duration so the
     // pipeline never finishes before the AI response.
     const aiPromise = analyze({ data: { imageDataUrl: dataUrl } });
-    const start = performance.now();
 
     try {
       // walk upload + ocr immediately
@@ -198,31 +206,42 @@ function Verify() {
       setStage("done");
       setAnalyzing(false);
 
-      // save scan history
+      // save scan history (Firestore + localStorage)
       const score = deriveScore(aiResult);
+      const scanRecord: ScanRecord = {
+        verificationId: aiResult.verificationMeta?.verificationId || "S-" + Math.random().toString(36).slice(2, 9).toUpperCase(),
+        timestamp: new Date().toISOString(),
+        medicineName: aiResult.medicineName || aiResult.detectedObject || "Unknown",
+        manufacturer: aiResult.manufacturer || "",
+        riskScore: aiResult.risk?.riskScore ?? 0,
+        authenticityScore: score,
+        blockchainHash: aiResult.blockchain?.transactionHash || "",
+        imageUrl: dataUrl,
+        riskLevel: aiResult.risk?.riskLevel,
+        status: scoreBand(score).label,
+      };
+      await saveScan(user?.uid, scanRecord);
       const entry: HistoryEntry = {
-        id: "S-" + Math.random().toString(36).slice(2, 9).toUpperCase(),
-        date: new Date().toISOString(),
-        name: aiResult.medicineName || aiResult.detectedObject || "Unknown",
-        manufacturer: aiResult.manufacturer,
+        id: scanRecord.verificationId,
+        date: scanRecord.timestamp,
+        name: scanRecord.medicineName,
+        manufacturer: scanRecord.manufacturer,
         batch: aiResult.batchNumber,
         score,
         status: scoreBand(score).label,
         thumb: dataUrl,
       };
-      saveHistoryEntry(entry);
-      setHistory(loadHistory());
-      // make linter happy
-      void start;
+      setHistory(prev => [entry, ...prev.filter(h => h.id !== entry.id)].slice(0, 20));
     } catch (e: any) {
       // Never surface raw technical errors — convert to a friendly envelope.
+      console.error("[MedChain:pipeline] Pipeline error:", e);
       setAnalysis({
         isMedicine: false,
         confidence: 0,
         description: "",
         friendlyError: {
-          title: "Unable to Analyse Image",
-          message: "Something went wrong while verifying this image. Please try again with a clearer photo of the medicine packaging.",
+          title: "Verification Failed",
+          message: "Verification record could not be generated. Please try again with a clearer photo of the medicine packaging.",
         },
       });
       setAnalyzeError(null);
@@ -370,8 +389,13 @@ function Verify() {
                       imageSrc={imageSrc!}
                       onReportOpen={() => setReportOpen(true)}
                     />
+                    {analysis.risk && <RiskBreakdownPanel risk={analysis.risk} />}
                     <AISummaryPanel analysis={analysis} score={score} band={band} />
                     <ConfidencePanel analysis={analysis} />
+                    {analysis.packaging && <PackagingAnalysisPanel packaging={analysis.packaging} />}
+                    {analysis.fraudIntelligence && <FraudIntelligencePanel fraud={analysis.fraudIntelligence} />}
+                    {analysis.trustInfo && <TrustScorePanel trust={analysis.trustInfo} />}
+                    {analysis.databaseMatch && <DatabaseMatchPanel match={analysis.databaseMatch} />}
                     <ReasoningPanel reasoning={analysis.reasoning} warnings={analysis.warnings} />
                     <BlockchainPanel analysis={analysis} score={score} />
                     <TrustedPharmacies />
@@ -888,29 +912,42 @@ function ResultPanel({
           <RadialGauge score={score} tone={band.tone} />
         </div>
         <div className="md:col-span-2 space-y-4">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono uppercase tracking-widest"
               style={{ color: `var(--${band.tone})`, background: `color-mix(in oklab, var(--${band.tone}) 18%, transparent)` }}>
               <BadgeIcon className="h-3.5 w-3.5" />{band.label}
             </span>
             <span className="text-xs text-muted-foreground">{band.desc}</span>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
             <Mini label="AI Confidence" value={`${analysis.confidence}%`} />
-            <Mini label="Warnings" value={String(analysis.warnings?.length || 0)} tone={analysis.warnings?.length ? "warn" : "emerald"} />
+            <Mini label="Risk Level" value={analysis.risk?.riskLevel || "—"} tone={analysis.risk?.riskLevel === "Low" ? "emerald" : analysis.risk?.riskLevel === "Critical" ? "destructive" : "warn"} />
+            <Mini label="Trust" value={analysis.trustInfo ? `${analysis.trustInfo.trustScore}%` : "—"} tone={analysis.trustInfo && analysis.trustInfo.trustScore >= 75 ? "emerald" : "warn"} />
+            <Mini label="Packaging" value={analysis.packaging ? `${analysis.packaging.packagingScore}%` : "—"} />
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
             <Mini label="Batch" value={analysis.batchNumber || "—"} />
             <Mini label="Expiry" value={analysis.expiryDate || "—"} />
+            <Mini label="Warnings" value={String(analysis.warnings?.length || 0)} tone={analysis.warnings?.length ? "warn" : "emerald"} />
+            <Mini label="Fraud Risk" value={analysis.fraudIntelligence?.fraudRisk || "—"} tone={analysis.fraudIntelligence?.fraudRisk === "Low" ? "emerald" : "destructive"} />
           </div>
+          {analysis.verificationMeta && (
+            <div className="flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-muted-foreground font-mono">
+              <span>ID: {analysis.verificationMeta.verificationId}</span>
+              <span>{new Date(analysis.verificationMeta.verificationTimestamp).toLocaleString()}</span>
+              <span>{analysis.verificationMeta.pipelineDuration}ms</span>
+            </div>
+          )}
           <div className="flex flex-wrap gap-2">
-            <button onClick={download} className="px-4 py-2 rounded-lg gradient-primary text-primary-foreground text-sm font-medium inline-flex items-center gap-2">
+            <button onClick={download} className="px-3 sm:px-4 py-2 rounded-lg gradient-primary text-primary-foreground text-xs sm:text-sm font-medium inline-flex items-center gap-2">
               <Download className="h-4 w-4" />Download Report
             </button>
-            <button onClick={() => navigator.share?.({ title: "MedChain verification", text: `${analysis.medicineName} — ${band.label} (${score}%)`, url: window.location.href }).catch(() => {})} className="px-4 py-2 rounded-lg glass text-sm font-medium inline-flex items-center gap-2">
+            <button onClick={() => navigator.share?.({ title: "MedChain verification", text: `${analysis.medicineName} — ${band.label} (${score}%)`, url: window.location.href }).catch(() => {})} className="px-3 sm:px-4 py-2 rounded-lg glass text-xs sm:text-sm font-medium inline-flex items-center gap-2">
               <Send className="h-4 w-4" />Share
             </button>
             {score < 75 && (
-              <button onClick={onReportOpen} className="px-4 py-2 rounded-lg border border-destructive/40 text-destructive bg-destructive/10 text-sm font-medium inline-flex items-center gap-2">
-                <Flag className="h-4 w-4" />Report Fake Medicine
+              <button onClick={onReportOpen} className="px-3 sm:px-4 py-2 rounded-lg border border-destructive/40 text-destructive bg-destructive/10 text-xs sm:text-sm font-medium inline-flex items-center gap-2">
+                <Flag className="h-4 w-4" />Report Fake
               </button>
             )}
           </div>
@@ -1015,16 +1052,17 @@ function ReasoningPanel({ reasoning, warnings }: { reasoning?: string[]; warning
 }
 
 /* ============================================================
-   Blockchain panel
+   Blockchain panel — uses real data from verification engine
    ============================================================ */
 function BlockchainPanel({ analysis, score }: { analysis: AnalyzeResult; score: number }) {
-  const tx = useMemo(() => {
+  const bc = analysis.blockchain;
+  const tx = bc?.transactionHash || useMemo(() => {
     const seed = (analysis.batchNumber || analysis.medicineName || "x") + score;
     const h = Array.from(seed).reduce((a, c) => (a * 33 + c.charCodeAt(0)) >>> 0, 7);
     const hex = (n: number) => n.toString(16).padStart(8, "0");
     return `0x${hex(h)}${hex(h * 13 >>> 0)}${hex(h * 29 >>> 0)}${hex(h * 7 >>> 0)}`;
   }, [analysis, score]);
-  const block = 48_213_770 + (tx.charCodeAt(4) % 9999);
+  const block = bc?.blockNumber || 48_213_770;
   const [copied, setCopied] = useState(false);
   function copyTx() {
     navigator.clipboard?.writeText(tx);
@@ -1032,7 +1070,7 @@ function BlockchainPanel({ analysis, score }: { analysis: AnalyzeResult; score: 
     setTimeout(() => setCopied(false), 1500);
   }
   return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl glass p-5">
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl glass p-4 sm:p-5">
       <div className="text-xs uppercase tracking-widest text-primary mb-3 flex items-center gap-2">
         <Lock className="h-3.5 w-3.5" />Blockchain Verification
         <span className="ml-auto inline-flex items-center gap-1 text-emerald text-[10px] font-mono">
@@ -1040,23 +1078,204 @@ function BlockchainPanel({ analysis, score }: { analysis: AnalyzeResult; score: 
           ANCHORED
         </span>
       </div>
-      <div className="grid sm:grid-cols-2 gap-3 text-sm">
-        <Mini label="Network" value="Polygon Mainnet" />
-        <Mini label="Smart Contract" value="MedChainRegistry.sol" />
+      <div className="grid grid-cols-2 gap-2 sm:gap-3 text-sm">
+        <Mini label="Network" value={bc?.network || "Polygon Mainnet"} />
+        <Mini label="Smart Contract" value={bc?.smartContract || "MedChainRegistry.sol"} />
         <Mini label="Block Number" value={"#" + block.toLocaleString()} />
-        <Mini label="Timestamp" value={new Date().toLocaleString()} />
+        <Mini label="Verification ID" value={bc?.verificationId || "—"} />
       </div>
       <div className="mt-3 rounded-lg border border-border bg-background/40 p-3">
         <div className="text-[10px] uppercase tracking-widest text-muted-foreground mb-1">Transaction Hash</div>
         <div className="flex items-center gap-2">
-          <code className="text-xs font-mono text-primary truncate flex-1">{tx}</code>
-          <button onClick={copyTx} className="text-xs px-2 py-1 rounded border border-border hover:border-primary/40 inline-flex items-center gap-1">
+          <code className="text-[10px] sm:text-xs font-mono text-primary truncate flex-1">{tx}</code>
+          <button onClick={copyTx} className="text-[10px] sm:text-xs px-2 py-1 rounded border border-border hover:border-primary/40 inline-flex items-center gap-1 shrink-0">
             <Copy className="h-3 w-3" />{copied ? "Copied" : "Copy"}
           </button>
-          <a href={`https://polygonscan.com/tx/${tx}`} target="_blank" rel="noreferrer" className="text-xs px-2 py-1 rounded border border-border hover:border-primary/40 inline-flex items-center gap-1">
+          <a href={`https://polygonscan.com/tx/${tx}`} target="_blank" rel="noreferrer" className="text-[10px] sm:text-xs px-2 py-1 rounded border border-border hover:border-primary/40 inline-flex items-center gap-1 shrink-0 hidden sm:inline-flex">
             <ExternalLink className="h-3 w-3" />Explorer
           </a>
         </div>
+      </div>
+      {bc?.verificationTimestamp && (
+        <div className="mt-2 text-[10px] text-muted-foreground font-mono">
+          Anchored: {new Date(bc.verificationTimestamp).toLocaleString()}
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+/* ============================================================
+   Risk Breakdown Panel
+   ============================================================ */
+function RiskBreakdownPanel({ risk }: { risk: NonNullable<AnalyzeResult["risk"]> }) {
+  const toneMap: Record<string, string> = { Low: "emerald", Medium: "warn", High: "destructive", Critical: "destructive" };
+  const tone = toneMap[risk.riskLevel] || "warn";
+  return (
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl glass p-4 sm:p-5">
+      <div className="text-xs uppercase tracking-widest text-primary mb-3 flex items-center justify-between">
+        <span className="inline-flex items-center gap-2"><Scale className="h-3.5 w-3.5" />Risk Assessment</span>
+        <span className="font-mono text-xs" style={{ color: `var(--${tone})` }}>{risk.riskLevel} · {risk.riskScore}/100</span>
+      </div>
+      <div className="space-y-2.5">
+        {risk.riskFactors.map((f, i) => (
+          <div key={f.factor}>
+            <div className="flex items-center justify-between text-xs mb-1">
+              <span className="text-muted-foreground">{f.factor}</span>
+              <span className="font-mono" style={{ color: f.score > 50 ? 'var(--destructive)' : f.score > 25 ? 'var(--warn)' : 'var(--emerald)' }}>{f.score}/100</span>
+            </div>
+            <div className="h-1.5 rounded-full bg-background/60 border border-border overflow-hidden">
+              <motion.div
+                className="h-full rounded-full"
+                style={{ background: f.score > 50 ? 'var(--destructive)' : f.score > 25 ? 'var(--warn)' : 'var(--emerald)' }}
+                initial={{ width: 0 }}
+                animate={{ width: `${f.score}%` }}
+                transition={{ duration: 0.8, delay: i * 0.08, ease: [0.16, 1, 0.3, 1] }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
+/* ============================================================
+   Packaging Analysis Panel
+   ============================================================ */
+function PackagingAnalysisPanel({ packaging }: { packaging: NonNullable<AnalyzeResult["packaging"]> }) {
+  const bars = [
+    { l: "Overall Score", v: packaging.packagingScore },
+    { l: "Print Quality", v: packaging.printQuality },
+    { l: "Label Consistency", v: packaging.labelConsistency },
+  ];
+  return (
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl glass p-4 sm:p-5">
+      <div className="text-xs uppercase tracking-widest text-primary mb-3 flex items-center justify-between">
+        <span className="inline-flex items-center gap-2"><Package className="h-3.5 w-3.5" />Packaging Analysis</span>
+        <span className={`text-[10px] font-mono px-2 py-0.5 rounded ${packaging.tamperingDetected ? 'bg-destructive/15 text-destructive' : 'bg-emerald/15 text-emerald'}`}>
+          {packaging.tamperingDetected ? 'TAMPERING DETECTED' : 'INTACT'}
+        </span>
+      </div>
+      <div className="grid sm:grid-cols-3 gap-3 mb-3">
+        {bars.map((b, i) => (
+          <div key={b.l}>
+            <div className="flex items-center justify-between text-xs mb-1">
+              <span className="text-muted-foreground">{b.l}</span>
+              <span className="font-mono text-primary">{b.v}%</span>
+            </div>
+            <div className="h-1.5 rounded-full bg-background/60 border border-border overflow-hidden">
+              <motion.div
+                className="h-full gradient-primary"
+                initial={{ width: 0 }}
+                animate={{ width: `${b.v}%` }}
+                transition={{ duration: 1, delay: i * 0.1 }}
+              />
+            </div>
+          </div>
+        ))}
+      </div>
+      {packaging.tamperingIndicators.length > 0 && (
+        <div className="mt-2 space-y-1">
+          {packaging.tamperingIndicators.map((t, i) => (
+            <div key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
+              <AlertTriangle className="h-3 w-3 text-warn mt-0.5 shrink-0" />{t}
+            </div>
+          ))}
+        </div>
+      )}
+      {packaging.missingElements.length > 0 && (
+        <div className="mt-2 space-y-1">
+          {packaging.missingElements.map((m, i) => (
+            <div key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
+              <Eye className="h-3 w-3 text-muted-foreground mt-0.5 shrink-0" />Missing: {m}
+            </div>
+          ))}
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+/* ============================================================
+   Fraud Intelligence Panel
+   ============================================================ */
+function FraudIntelligencePanel({ fraud }: { fraud: NonNullable<AnalyzeResult["fraudIntelligence"]> }) {
+  const toneMap: Record<string, string> = { Low: "emerald", Medium: "warn", High: "destructive", Critical: "destructive" };
+  const tone = toneMap[fraud.fraudRisk] || "warn";
+  return (
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl glass p-4 sm:p-5">
+      <div className="text-xs uppercase tracking-widest text-primary mb-3 flex items-center justify-between">
+        <span className="inline-flex items-center gap-2"><ShieldAlert className="h-3.5 w-3.5" />Fraud Intelligence</span>
+        <span className="font-mono text-xs" style={{ color: `var(--${tone})` }}>{fraud.fraudRisk} Risk</span>
+      </div>
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3 mb-3">
+        <Mini label="Fraud Risk" value={fraud.fraudRisk} tone={tone} />
+        <Mini label="Counterfeit Prob." value={`${fraud.counterfeitProbability}%`} tone={fraud.counterfeitProbability > 30 ? "destructive" : "emerald"} />
+        <Mini label="Regional Risk" value={fraud.regionalRisk} />
+      </div>
+      <div className="space-y-1.5">
+        {fraud.fraudIndicators.map((ind, i) => (
+          <div key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
+            {fraud.fraudRisk === "Low" ? <CheckCircle2 className="h-3 w-3 text-emerald mt-0.5 shrink-0" /> : <AlertTriangle className="h-3 w-3 text-warn mt-0.5 shrink-0" />}
+            {ind}
+          </div>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
+/* ============================================================
+   Trust Score Panel
+   ============================================================ */
+function TrustScorePanel({ trust }: { trust: NonNullable<AnalyzeResult["trustInfo"]> }) {
+  const tone = trust.trustScore >= 75 ? "emerald" : trust.trustScore >= 50 ? "warn" : "destructive";
+  return (
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl glass p-4 sm:p-5">
+      <div className="text-xs uppercase tracking-widest text-primary mb-3 flex items-center justify-between">
+        <span className="inline-flex items-center gap-2"><Fingerprint className="h-3.5 w-3.5" />Trust Intelligence</span>
+        <span className="font-mono text-xs" style={{ color: `var(--${tone})` }}>{trust.trustLevel} · {trust.trustScore}/100</span>
+      </div>
+      <div className="h-2 rounded-full bg-background/60 border border-border overflow-hidden mb-3">
+        <motion.div
+          className="h-full rounded-full"
+          style={{ background: `var(--${tone})` }}
+          initial={{ width: 0 }}
+          animate={{ width: `${trust.trustScore}%` }}
+          transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
+        />
+      </div>
+      <div className="space-y-1">
+        {trust.factors.map((f, i) => (
+          <div key={i} className="flex items-center gap-2 text-xs text-muted-foreground">
+            <Activity className="h-3 w-3 shrink-0" />{f}
+          </div>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
+/* ============================================================
+   Database Match Panel
+   ============================================================ */
+function DatabaseMatchPanel({ match }: { match: NonNullable<AnalyzeResult["databaseMatch"]> }) {
+  return (
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="rounded-2xl glass p-4 sm:p-5">
+      <div className="text-xs uppercase tracking-widest text-primary mb-3 flex items-center justify-between">
+        <span className="inline-flex items-center gap-2"><Database className="h-3.5 w-3.5" />Medicine Database</span>
+        <span className={`text-[10px] font-mono px-2 py-0.5 rounded ${match.matchFound ? 'bg-emerald/15 text-emerald' : 'bg-warn/15 text-warn'}`}>
+          {match.matchFound ? `MATCHED · ${match.similarityScore}%` : 'NOT FOUND'}
+        </span>
+      </div>
+      <div className="space-y-1.5">
+        {match.matchDetails.map((d, i) => (
+          <div key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
+            {match.matchFound ? <CheckCircle2 className="h-3 w-3 text-emerald mt-0.5 shrink-0" /> : <Search className="h-3 w-3 text-muted-foreground mt-0.5 shrink-0" />}
+            {d}
+          </div>
+        ))}
       </div>
     </motion.div>
   );
