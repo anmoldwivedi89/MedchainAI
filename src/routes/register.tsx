@@ -98,9 +98,9 @@ function Register() {
         )}
 
         <form onSubmit={onSubmit} className="space-y-4 mt-6">
-          <F label="Full Name" placeholder="Dr. Rahul Sharma" value={name} onChange={(e) => setName(e.target.value)} required />
-          <F label="Email" type="email" placeholder="you@hospital.org" value={email} onChange={(e) => setEmail(e.target.value)} required />
-          <F label="Password" type="password" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} required />
+          <F label="Full Name" placeholder="Enter your full name" autoComplete="name" value={name} onChange={(e) => setName(e.target.value)} required />
+          <F label="Email" type="email" placeholder="Enter your email address" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+          <F label="Password" type="password" placeholder="Create a strong password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
 
           {/* Role selection */}
           <div>
@@ -109,10 +109,13 @@ function Register() {
               {ROLES.map((r) => {
                 const I = r.icon;
                 const active = role === r.id;
+                // Add optional descriptions based on the role
+                const desc = r.id === "user" ? "Verify medicines and report fraud" : r.id === "company" ? "Register and manage medicines" : "Verify inventory and build trust score";
                 return (
                   <button
                     key={r.id}
                     type="button"
+                    title={desc}
                     onClick={() => setRole(r.id)}
                     className={`py-2.5 rounded-lg border text-xs font-medium inline-flex items-center justify-center gap-1.5 transition-all ${
                       active
@@ -145,11 +148,11 @@ function Register() {
           >
             {loading ? (
               <>
-                <Loader2 className="h-4 w-4 animate-spin" /> Creating account...
+                <Loader2 className="h-4 w-4 animate-spin" /> Creating Account...
               </>
             ) : (
               <>
-                Create account <ArrowRight className="h-4 w-4" />
+                Create Account <ArrowRight className="h-4 w-4" />
               </>
             )}
           </button>
