@@ -40,7 +40,7 @@ function Page() {
     try {
       const { collection, getDocs, query, where } = await import("firebase/firestore");
       const { getFirebaseDb } = await import("@/lib/firebase");
-      const db = getFirebaseDb();
+      const db = await getFirebaseDb();
       const q = query(collection(db, "companies"), where("verified", "==", false));
       const snap = await getDocs(q);
       const companies: PendingCompany[] = [];
@@ -65,7 +65,7 @@ function Page() {
     try {
       const { doc, updateDoc } = await import("firebase/firestore");
       const { getFirebaseDb } = await import("@/lib/firebase");
-      const db = getFirebaseDb();
+      const db = await getFirebaseDb();
       await updateDoc(doc(db, "companies", companyId), { verified: true });
       setPendingCompanies((prev) => prev.filter((c) => c.id !== companyId));
     } catch (err) {
@@ -77,7 +77,7 @@ function Page() {
     try {
       const { doc, updateDoc } = await import("firebase/firestore");
       const { getFirebaseDb } = await import("@/lib/firebase");
-      const db = getFirebaseDb();
+      const db = await getFirebaseDb();
       await updateDoc(doc(db, "companies", companyId), { verified: false, rejected: true });
       setPendingCompanies((prev) => prev.filter((c) => c.id !== companyId));
     } catch (err) {

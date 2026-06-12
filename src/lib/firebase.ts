@@ -1,6 +1,5 @@
-import { initializeApp, getApps, type FirebaseApp } from "firebase/app";
-import { getAuth, type Auth } from "firebase/auth";
-import { getFirestore, type Firestore } from "firebase/firestore";
+// Firebase helper — ONLY import this from client-side code (useEffect, event handlers)
+// NEVER import at module level in files that run during SSR
 
 const firebaseConfig = {
   apiKey: "AIzaSyBWRYCcldUcjekGUyUAcqRikPZkvcfaGhA",
@@ -12,34 +11,19 @@ const firebaseConfig = {
   measurementId: "G-PEZWTFB7C1",
 };
 
-// Lazy-initialize only on client side to avoid SSR crashes
-let _app: FirebaseApp | undefined;
-let _auth: Auth | undefined;
-let _db: Firestore | undefined;
-
-function getApp(): FirebaseApp {
-  if (!_app) {
-    _app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
-  }
-  return _app;
+export async function getFirebaseApp() {
+  const { initializeApp, getApps } = await import("firebase/app");
+  return getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 }
 
-export function getFirebaseAuth(): Auth {
-  if (!_auth) {
-    _auth = getAuth(getApp());
-  }
-  return _auth;
+export async function getFirebaseAuth() {
+  const { getAuth } = await import("firebase/auth");
+  const app = await getFirebaseApp();
+  return getAuth(app);
 }
 
-export function getFirebaseDb(): Firestore {
-  if (!_db) {
-    _db = getFirestore(getApp());
-  }
-  return _db;
+export async function getFirebaseDb() {
+  const { getFirestore } = await import("firebase/firestore");
+  const app = await getFirebaseApp();
+  return getFirestore(app);
 }
-
-// For backward compat — these will throw on server if called at module level
-// But are safe when called inside useEffect/event handlers (client only)
-export const auth = typeof window !== "undefined" ? getFirebaseAuth() : (null as unknown as Auth);
-export const db = typeof window !== "undefined" ? getFirebaseDb() : (null as unknown as Firestore);
-export default _app;

@@ -43,7 +43,7 @@ function Page() {
     try {
       const { collection, getDocs, query, where } = await import("firebase/firestore");
       const { getFirebaseDb } = await import("@/lib/firebase");
-      const db = getFirebaseDb();
+      const db = await getFirebaseDb();
       const q = query(collection(db, "bpo_officers"), where("companyId", "==", user!.uid));
       const snap = await getDocs(q);
       const officers: BPO[] = [];
@@ -73,7 +73,7 @@ function Page() {
     try {
       const { collection, addDoc } = await import("firebase/firestore");
       const { getFirebaseDb } = await import("@/lib/firebase");
-      const db = getFirebaseDb();
+      const db = await getFirebaseDb();
       const docRef = await addDoc(collection(db, "bpo_officers"), {
         ...bpoForm,
         companyId: user!.uid,
@@ -93,7 +93,7 @@ function Page() {
     try {
       const { doc, deleteDoc } = await import("firebase/firestore");
       const { getFirebaseDb } = await import("@/lib/firebase");
-      const db = getFirebaseDb();
+      const db = await getFirebaseDb();
       await deleteDoc(doc(db, "bpo_officers", bpoId));
       setBpoList((prev) => prev.filter((b) => b.id !== bpoId));
     } catch (err) {

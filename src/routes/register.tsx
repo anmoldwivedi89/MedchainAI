@@ -39,7 +39,7 @@ function Register() {
       // Dynamic import for Firestore (SSR safe)
       const { doc, setDoc } = await import("firebase/firestore");
       const { getFirebaseDb } = await import("@/lib/firebase");
-      const db = getFirebaseDb();
+      const db = await getFirebaseDb();
 
       // Save user doc in Firestore
       await setDoc(doc(db, "users", user.uid), {
